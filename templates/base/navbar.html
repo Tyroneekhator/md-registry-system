@@ -1,0 +1,171 @@
+<!-- ================================================== -->
+<!-- Navigation Bar                                     -->
+<!-- ================================================== -->
+
+<nav class="navbar navbar-expand-lg bg-white border-bottom">
+
+    <div class="container">
+
+        <!-- ------------------------------------------------ -->
+        <!-- Brand / Logo                                     -->
+        <!-- ------------------------------------------------ -->
+        <a class="navbar-brand fw-semibold"
+           href="{% url 'records:home' %}">
+            MD Registry
+        </a>
+
+        <!-- ------------------------------------------------ -->
+        <!-- Mobile Toggle Button                             -->
+        <!-- ------------------------------------------------ -->
+        <button class="navbar-toggler"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#mainNavbar"
+                aria-controls="mainNavbar"
+                aria-expanded="false"
+                aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <!-- ------------------------------------------------ -->
+        <!-- Collapsible Navbar Content                       -->
+        <!-- ------------------------------------------------ -->
+        <div class="collapse navbar-collapse" id="mainNavbar">
+
+            <!-- ============================================ -->
+            <!-- Left Side Navigation Links                   -->
+            <!-- ============================================ -->
+            <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+
+                {% if request.session.user_id %}
+
+                    <!-- Dashboard -->
+                    <li class="nav-item">
+                        <a class="nav-link"
+                           href="{% url 'records:dashboard' %}">
+                            Dashboard
+                        </a>
+                    </li>
+
+                    <!-- Records -->
+                    <li class="nav-item">
+                        <a class="nav-link"
+                           href="{% url 'records:records_table' %}">
+                            Records
+                        </a>
+                    </li>
+
+                    <!-- Workflow / Requests -->
+                    <li class="nav-item">
+                        <a class="nav-link"
+                           href="{% url 'workflow:requests_list' %}">
+                            Requests
+                        </a>
+                    </li>
+
+                    <!-- Admin Dropdown -->
+                    {% if is_admin %}
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle"
+                               href="#"
+                               id="adminDropdown"
+                               role="button"
+                               data-bs-toggle="dropdown"
+                               aria-expanded="false">
+                                Admin
+                            </a>
+
+                            <ul class="dropdown-menu border rounded shadow-sm"
+                                aria-labelledby="adminDropdown">
+
+                                <li>
+                                    <a class="dropdown-item"
+                                       href="{% url 'accounts:users_list' %}">
+                                        Manage Users
+                                    </a>
+                                </li>
+
+                                <li>
+                                    <a class="dropdown-item"
+                                       href="{% url 'accounts:groups_list' %}">
+                                        Manage Roles
+                                    </a>
+                                </li>
+
+                                <!-- ✅ NEW: Departments (Admin only) -->
+                                <li>
+                                    <a class="dropdown-item"
+                                       href="{% url 'organization:departments_list' %}">
+                                        Manage Departments
+                                    </a>
+                                </li>
+
+                                <li><hr class="dropdown-divider"></li>
+
+                                <li>
+                                    <a class="dropdown-item"
+                                       href="{% url 'workflow:audit_dashboard' %}">
+                                        Audit Dashboard
+                                    </a>
+                                </li>
+
+                                <li>
+                                    <a class="dropdown-item"
+                                       href="{% url 'workflow:deleted_records_list' %}">
+                                        Deleted Records
+                                    </a>
+                                </li>
+
+                            </ul>
+                        </li>
+                    {% endif %}
+
+                {% endif %}
+
+            </ul>
+
+            <!-- ============================================ -->
+            <!-- Right Side Navigation Links                  -->
+            <!-- ============================================ -->
+            <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+
+                {% if request.session.user_id %}
+
+                    <!-- Profile -->
+                    <li class="nav-item">
+                        <a class="nav-link"
+                           href="{% url 'accounts:profile' %}">
+                            <i class="bi bi-person-circle me-1"></i>
+                            Profile
+                        </a>
+                    </li>
+
+                    <!-- Logout -->
+                    <li class="nav-item">
+                        <form method="post" action="{% url 'accounts:logout' %}" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="nav-link text-danger btn btn-link p-0">
+                                <i class="bi bi-box-arrow-right me-1"></i>Logout
+                            </button>
+                        </form>
+                    </li>
+
+                {% else %}
+
+                    <!-- Login -->
+                    <li class="nav-item">
+                        <a class="nav-link"
+                           href="{% url 'accounts:login' %}">
+                            Login
+                        </a>
+                    </li>
+
+                {% endif %}
+
+            </ul>
+
+        </div>
+
+    </div>
+
+</nav>

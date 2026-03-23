@@ -1,0 +1,397 @@
+{% extends "base/base.html" %}
+{% load static %}
+{% load humanize %}
+
+{# ---------------------------------------------------- #}
+{# Page Title                                           #}
+{# ---------------------------------------------------- #}
+{% block title %}Record Details{% endblock %}
+
+{% block content %}
+
+<div class="container py-4">
+
+  <!-- ================================================= -->
+  <!-- Page Header                                        -->
+  <!-- ================================================= -->
+  <div class="d-flex justify-content-between align-items-start mb-3">
+
+    <div>
+      <h1 class="h5 mb-1">
+        {{ record.Subject|default:"Record Details" }}
+      </h1>
+      <p class="text-muted small mb-0">
+        Record details and attachments.
+      </p>
+    </div>
+
+    <div class="d-flex gap-2">
+
+      <!-- Back -->
+      {# CORRECTION: if record is deleted, go back to Deleted Records #}
+      {% if record.IsDeleted %}
+        <a href="{% url 'workflow:deleted_records_list' %}" class="btn btn-outline-secondary btn-sm">
+          Back
+        </a>
+      {% else %}
+        <a href="{% url 'records:records_table' %}" class="btn btn-outline-secondary btn-sm">
+          Back
+        </a>
+      {% endif %}
+
+      {% if is_admin or is_clerk %}
+
+        {# CORRECTION: hide Edit for clerk when viewing a deleted record #}
+        {% if record.IsDeleted %}
+          {% if is_admin %}
+            <a href="{% url 'records:record_edit' record.RecordID %}" class="btn btn-outline-primary btn-sm">
+              Edit
+            </a>
+          {% endif %}
+        {% else %}
+          <a href="{% url 'records:record_edit' record.RecordID %}" class="btn btn-outline-primary btn-sm">
+            Edit
+          </a>
+        {% endif %}
+
+        <!-- Soft Delete -->
+        {% if not record.IsDeleted %}
+          <form method="post" action="{% url 'records:record_soft_delete' record.RecordID %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+          </form>
+        {% endif %}
+
+      {% endif %}
+
+    </div>
+  </div>
+
+  <!-- ================================================= -->
+  <!-- Record Information Card                            -->
+  <!-- ================================================= -->
+  <div class="bg-white border rounded p-4 mb-4">
+
+    {# ========================================================= #}
+    {# ✅ ADJUSTMENT: Viewer is INSIDE this Record Details card   #}
+    {# ✅ ADJUSTMENT: Split card into 2 columns                   #}
+    {# LEFT = fields, RIGHT = viewer                              #}
+    {# ========================================================= #}
+    <div class="row g-4 align-items-start">
+
+      {# ======================== #}
+      {# LEFT: Record fields      #}
+      {# ======================== #}
+      <div class="col-12 col-lg-6">
+
+        <div class="row mb-3">
+          <div class="col-sm-4 text-muted">Record ID</div>
+          <div class="col-sm-8">{{ record.RecordID }}</div>
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-sm-4 text-muted">Messenger Name</div>
+          <div class="col-sm-8">{{ record.MessengerName|default:"—" }}</div>
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-sm-4 text-muted">Invoice Number</div>
+          <div class="col-sm-8">{{ record.InvoiceNumber|intcomma }}</div>
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-sm-4 text-muted">Subject</div>
+          <div class="col-sm-8">{{ record.Subject|default:"—" }}</div>
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-sm-4 text-muted">Description</div>
+          <div class="col-sm-8">{{ record.Description|default:"—" }}</div>
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-sm-4 text-muted">Date Received</div>
+          <div class="col-sm-8">
+            {% if record.DateReceived %}
+              {{ record.DateReceived|date:"Y-m-d H:i" }}
+            {% else %}
+              —
+            {% endif %}
+          </div>
+        </div>
+
+
+        <div class="row mb-3">
+          <div class="col-sm-4 text-muted">External Company Name</div>
+          <div class="col-sm-8">
+            {% if record.ExternalCompanyName %}
+              {{ record.ExternalCompanyName.CompanyName }}
+            {% else %}
+            —
+            {% endif %}
+          </div>
+        </div>
+
+        {% if record.ExternalDocument != "Yes" %}
+          <div class="row mb-3">
+            <div class="col-sm-4 text-muted">Incoming Department</div>
+            <div class="col-sm-8">
+              {% if record.IncomingDepartmentID %}
+                {{ record.IncomingDepartmentID.DepartmentName }}
+              {% else %}
+                —
+              {% endif %}
+            </div>
+          </div>
+
+          <div class="row mb-3">
+            <div class="col-sm-4 text-muted">Outgoing Department</div>
+            <div class="col-sm-8">
+              {% if record.OutgoingDepartmentID %}
+                {{ record.OutgoingDepartmentID.DepartmentName }}
+              {% else %}
+                —
+              {% endif %}
+            </div>
+          </div>
+        {% endif %}
+
+        <div class="row mb-3">
+          <div class="col-sm-4 text-muted">Date Dispatched</div>
+          <div class="col-sm-8">
+            {% if record.DateDispatched %}
+              {{ record.DateDispatched|date:"Y-m-d H:i" }}
+            {% else %}
+              —
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-sm-4 text-muted">Status</div>
+          <div class="col-sm-8">
+            {% if record.IsDeleted %}
+              <span class="badge text-bg-danger">Deleted</span>
+            {% else %}
+              <span class="badge text-bg-secondary">{{ record.Status|default:"—" }}</span>
+            {% endif %}
+          </div>
+        </div>
+
+        <div class="row mb-3">
+          <div class="col-sm-4 text-muted">Returned</div>
+          <div class="col-sm-8">{{ record.Returned|default:"—" }}</div>
+        </div>
+
+        <div class="row">
+          <div class="col-sm-4 text-muted">Date Returned</div>
+          <div class="col-sm-8">
+            {% if record.DateReturned %}
+              {{ record.DateReturned|date:"Y-m-d" }}
+            {% else %}
+              —
+            {% endif %}
+          </div>
+        </div>
+
+      </div>
+
+      {# ======================== #}
+      {# RIGHT: Document Viewer   #}
+      {# ======================== #}
+      <div class="col-12 col-lg-6">
+
+        {# ========================================================= #}
+        {# ✅ ADJUSTMENT: Viewer is RIGHT-ALIGNED inside record card  #}
+        {# ========================================================= #}
+        <div class="d-flex justify-content-end">
+          <div class="w-100" style="max-width: 560px;">
+
+            {# ========================================================= #}
+            {# ✅ IMPROVEMENT: PDF VIEWER FIRST                           #}
+            {# "Document Preview" header + buttons moved BELOW the viewer #}
+            {# ========================================================= #}
+            <div class="border rounded overflow-hidden mb-3" style="height: 640px; min-height: 520px;">
+              {% if latest_attachment %}
+                <iframe
+                  id="pdfViewerFrame"
+                  src="{% url 'records:attachment_pdf' latest_attachment.AttachmentID %}"
+                  style="width:100%; height:100%; border:0;"
+                  title="PDF Preview">
+                </iframe>
+              {% else %}
+                <div class="h-100 d-flex align-items-center justify-content-center text-muted">
+                  Upload an attachment to preview it here.
+                </div>
+              {% endif %}
+            </div>
+
+            {# ========================================================= #}
+            {# ✅ IMPROVEMENT: "Document Preview" + buttons BELOW viewer  #}
+            {# ========================================================= #}
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <div class="fw-semibold">Document Preview</div>
+
+              <div class="d-flex gap-2">
+                <a id="openInNewTabBtn"
+                   href="{% if latest_attachment %}{% url 'records:attachment_pdf' latest_attachment.AttachmentID %}{% else %}#{% endif %}"
+                   target="_blank"
+                   rel="noopener"
+                   class="btn btn-outline-primary btn-sm {% if not latest_attachment %}disabled{% endif %}">
+                  Open in new tab
+                </a>
+
+                <a id="downloadBtn"
+                   href="{% if latest_attachment %}{% url 'records:attachment_download' latest_attachment.AttachmentID %}{% else %}#{% endif %}"
+                   class="btn btn-outline-secondary btn-sm {% if not latest_attachment %}disabled{% endif %}">
+                  Download
+                </a>
+              </div>
+            </div>
+
+            <div class="small text-muted mb-2">Select a file to preview:</div>
+
+            {% if attachments %}
+              {# ✅ compact, scrollable selector list #}
+              <div class="list-group mb-1" id="attachmentList" style="max-height: 140px; overflow:auto;">
+                {% for a in attachments %}
+                  <a href="{% url 'records:attachment_pdf' a.AttachmentID %}"
+                     class="list-group-item list-group-item-action {% if latest_attachment and a.AttachmentID == latest_attachment.AttachmentID %}active{% endif %}"
+                     data-pdf-url="{% url 'records:attachment_pdf' a.AttachmentID %}"
+                     data-download-url="{% url 'records:attachment_download' a.AttachmentID %}">
+                    {{ a.OriginalFileName }}
+                    <div class="small opacity-75">{{ a.UploadedAt|date:"Y-m-d H:i" }}</div>
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="text-muted small mb-1">No attachments uploaded yet.</div>
+            {% endif %}
+
+            <div class="small text-muted mt-2">
+              Tip: Use the PDF toolbar to zoom, print, or download.
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================================================= -->
+  <!-- Attachments Section                                -->
+  <!-- ================================================= -->
+  <div class="bg-white border rounded p-4 mb-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="h6 mb-0">Attachments</h2>
+
+      {% if is_admin or is_clerk %}
+        <form method="POST"
+              enctype="multipart/form-data"
+              action="{% url 'records:attachment_upload' record.RecordID %}"
+              class="d-flex gap-2">
+          {% csrf_token %}
+
+          {# ✅ keeps upload on this detail page #}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+
+          <input type="file" name="files" class="form-control form-control-sm" multiple required>
+
+          <button type="submit" class="btn btn-outline-primary btn-sm">
+            Upload
+          </button>
+        </form>
+      {% endif %}
+    </div>
+
+    <div class="table-responsive">
+      <table class="table align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>File Name</th>
+            <th>Uploaded At</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for attachment in attachments %}
+          <tr>
+            <td>{{ attachment.OriginalFileName }}</td>
+            <td>{{ attachment.UploadedAt|date:"Y-m-d H:i" }}</td>
+
+            <td class="text-end">
+              <a href="{% url 'records:attachment_pdf' attachment.AttachmentID %}"
+                 target="_blank" rel="noopener"
+                 class="btn btn-outline-primary btn-sm">
+                Preview (PDF)
+              </a>
+
+              <a href="{% url 'records:attachment_download' attachment.AttachmentID %}"
+                 class="btn btn-outline-secondary btn-sm">
+                Download
+              </a>
+
+              {% if is_admin or is_clerk %}
+                <a href="{% url 'records:attachment_delete' attachment.AttachmentID %}"
+                   class="btn btn-outline-danger btn-sm">
+                  Remove
+                </a>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="3" class="text-center text-muted py-4">No attachments found.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/records.js' %}"></script>
+
+{# ========================================================= #}
+{# JS: click file -> loads into iframe + updates buttons      #}
+{# ========================================================= #}
+<script>
+(function () {
+  const list = document.getElementById("attachmentList");
+  const frame = document.getElementById("pdfViewerFrame");
+  const openBtn = document.getElementById("openInNewTabBtn");
+  const dlBtn = document.getElementById("downloadBtn");
+
+  if (!list || !frame || !openBtn || !dlBtn) return;
+
+  list.addEventListener("click", function (e) {
+    const link = e.target.closest("a.list-group-item");
+    if (!link) return;
+
+    e.preventDefault();
+
+    const pdfUrl = link.getAttribute("data-pdf-url");
+    const downloadUrl = link.getAttribute("data-download-url");
+
+    frame.src = pdfUrl;
+    openBtn.href = pdfUrl;
+    dlBtn.href = downloadUrl;
+
+    openBtn.classList.remove("disabled");
+    dlBtn.classList.remove("disabled");
+
+    list.querySelectorAll(".list-group-item").forEach(a => a.classList.remove("active"));
+    link.classList.add("active");
+  });
+})();
+</script>
+{% endblock %}

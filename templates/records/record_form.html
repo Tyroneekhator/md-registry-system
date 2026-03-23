@@ -1,0 +1,350 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}
+  {% if mode == "edit" %}Edit Record{% else %}Add Record{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h5 mb-1 fw-bold">
+        {% if mode == "edit" %}Edit Record{% else %}Add Record{% endif %}
+      </h1>
+      <p class="text-muted small mb-0">Fill in the registry information below.</p>
+    </div>
+
+    <div class="d-flex gap-2">
+      {% if mode == "edit" %}
+      <a href="{% url 'records:record_detail' record.RecordID %}"
+         class="btn btn-outline-secondary btn-sm">
+        Back to Record Detail
+      </a>
+      {% endif %}
+
+      <a href="{% url 'records:records_table' %}"
+         class="btn btn-outline-secondary btn-sm">
+        Back to Records
+      </a>
+    </div>
+  </div>
+
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {% with data=form_data %}
+
+      <div class="row g-3">
+
+        <div class="col-lg-6">
+          <div class="bg-white border mb-3">
+            <div class="border-bottom px-3 py-2 fw-semibold">Document Information</div>
+            <div class="p-3">
+              <div class="row g-3">
+
+                <div class="col-md-6">
+                  <label class="form-label small">Messenger name</label>
+                  <input type="text" name="MessengerName" class="form-control form-control-sm"
+                         value="{% if data.MessengerName %}{{ data.MessengerName }}{% elif record %}{{ record.MessengerName|default:'' }}{% endif %}" required>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label small">Invoice number</label>
+                  <input type="text" name="InvoiceNumber" class="form-control form-control-sm"
+                         value="{% if data.InvoiceNumber %}{{ data.InvoiceNumber }}{% elif record %}{{ record.InvoiceNumber|default:'' }}{% endif %}"
+                         placeholder="e.g. 111,123"
+                         inputmode="numeric"
+                         required>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label small">Subject</label>
+                  <input type="text" name="Subject" class="form-control form-control-sm"
+                         value="{% if data.Subject %}{{ data.Subject }}{% elif record %}{{ record.Subject|default:'' }}{% endif %}" required>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label small">Date received</label>
+                  <input type="datetime-local" name="DateReceived" class="form-control form-control-sm"
+                         value="{% if data.DateReceived %}{{ data.DateReceived }}{% elif record and record.DateReceived %}{{ record.DateReceived|date:'Y-m-d\\TH:i' }}{% endif %}" required>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label small">External Document</label>
+                  <select name="ExternalDocument"
+                          id="externalDocumentSelect"
+                          class="form-select form-select-sm">
+                    <option value="No"
+                      {% if data.ExternalDocument == "No" %}
+                        selected
+                      {% elif not data.ExternalDocument and record and record.ExternalDocument == "No" %}
+                        selected
+                      {% elif not data.ExternalDocument and not record %}
+                        selected
+                      {% endif %}>
+                      No
+                    </option>
+                    <option value="Yes"
+                      {% if data.ExternalDocument == "Yes" %}
+                        selected
+                      {% elif not data.ExternalDocument and record and record.ExternalDocument == "Yes" %}
+                        selected
+                      {% endif %}>
+                      Yes
+                    </option>
+                  </select>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label small">External Company Name</label>
+                  <input type="text"
+                         name="external_company_name"
+                         class="form-control form-control-sm"
+                         value="{% if data.external_company_name %}{{ data.external_company_name }}{% elif record and record.ExternalCompanyName %}{{ record.ExternalCompanyName.CompanyName|default:'' }}{% endif %}"
+                         placeholder="Type company name">
+                </div>
+
+                <div class="col-12">
+                  <label class="form-label small">Description</label>
+                  <textarea name="Description" class="form-control form-control-sm" rows="3" required>{% if data.Description %}{{ data.Description }}{% elif record %}{{ record.Description|default:'' }}{% endif %}</textarea>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white border">
+            <div class="border-bottom px-3 py-2 fw-semibold">Departments</div>
+            <div class="p-3">
+              <div class="row g-3" id="departmentsSection">
+
+                <div class="col-12">
+                  <label class="form-label small">Incoming Department Name</label>
+
+                  <select name="IncomingDepartmentID" id="incomingDepartmentSelect" class="form-select form-select-sm">
+                    <option value="">-- Select Department --</option>
+                    {% for dept in departments %}
+                      <option value="{{ dept.DepartmentID }}"
+                        {% if data.IncomingDepartmentID == dept.DepartmentID|stringformat:"s" %}
+                          selected
+                        {% elif not data.IncomingDepartmentID and record and record.IncomingDepartmentID and record.IncomingDepartmentID.DepartmentID == dept.DepartmentID %}
+                          selected
+                        {% endif %}>
+                        {{ dept.DepartmentName }}
+                      </option>
+                    {% endfor %}
+                  </select>
+
+                  <input type="text"
+                         name="incoming_department_new"
+                         id="incomingDepartmentNewInput"
+                         class="form-control mt-2"
+                         value="{{ data.incoming_department_new|default:'' }}"
+                         placeholder="Or type new department name">
+                </div>
+
+                <div class="col-12">
+                  <label class="form-label small">Outgoing Department Name</label>
+
+                  <select name="OutgoingDepartmentID"
+                          id="outgoingDepartmentSelect"
+                          class="form-select form-select-sm">
+                    <option value="">-- Select Department --</option>
+                    {% for dept in departments %}
+                      <option value="{{ dept.DepartmentID }}"
+                        {% if data.OutgoingDepartmentID == dept.DepartmentID|stringformat:"s" %}
+                          selected
+                        {% elif not data.OutgoingDepartmentID and record and record.OutgoingDepartmentID and record.OutgoingDepartmentID.DepartmentID == dept.DepartmentID %}
+                          selected
+                        {% endif %}>
+                        {{ dept.DepartmentName }}
+                      </option>
+                    {% endfor %}
+                  </select>
+
+                  <input type="text"
+                         name="outgoing_department_new"
+                         id="outgoingDepartmentNewInput"
+                         class="form-control mt-2"
+                         value="{{ data.outgoing_department_new|default:'' }}"
+                         placeholder="Or type new department name">
+                </div>
+
+                <div class="col-12">
+                  <div id="externalDocumentNotice" class="alert alert-info py-2 px-3 mb-0 d-none">
+                    Incoming Department and Outgoing Department are disabled because this is marked as an external document.
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-6">
+          <div class="bg-white border mb-3">
+            <div class="border-bottom px-3 py-2 fw-semibold">Tracking & Return</div>
+            <div class="p-3">
+              <div class="row g-3">
+
+                <div class="col-md-6">
+                  <label class="form-label small">Date Dispatched</label>
+                  <input type="datetime-local"  id="dateDispatchedInput" name="DateDispatched" class="form-control form-control-sm"
+                         value="{% if data.DateDispatched %}{{ data.DateDispatched }}{% elif record and record.DateDispatched %}{{ record.DateDispatched|date:'Y-m-d\\TH:i' }}{% endif %}">
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label small">Status</label>
+                  <select name="Status" id="statusSelect" class="form-select form-select-sm" required>
+                    <option value=""
+                      {% if not data.Status and not record %}
+                        selected
+                      {% elif not data.Status and record and not record.Status %}
+                        selected
+                      {% endif %}>
+                      -- Select --
+                    </option>
+                    <option value="With MD"
+                      {% if data.Status == "With MD" %}
+                        selected
+                      {% elif not data.Status and record and record.Status == "With MD" %}
+                        selected
+                      {% endif %}>
+                      With MD
+                    </option>
+                    <option value="Not with MD"
+                      {% if data.Status == "Not with MD" %}
+                        selected
+                      {% elif not data.Status and record and record.Status == "Not with MD" %}
+                        selected
+                      {% endif %}>
+                      Not with MD
+                    </option>
+                  </select>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label small">Returned</label>
+                  <select name="Returned" id="returnedSelect" class="form-select form-select-sm">
+                    <option value=""
+                      {% if not data.Returned and not record %}
+                        selected
+                      {% elif not data.Returned and record and not record.Returned %}
+                        selected
+                      {% endif %}>
+                      -- Select --
+                    </option>
+                    <option value="Yes"
+                      {% if data.Returned == "Yes" %}
+                        selected
+                      {% elif not data.Returned and record and record.Returned == "Yes" %}
+                        selected
+                      {% endif %}>
+                      Yes
+                    </option>
+                    <option value="No"
+                      {% if data.Returned == "No" %}
+                        selected
+                      {% elif not data.Returned and record and record.Returned == "No" %}
+                        selected
+                      {% endif %}>
+                      No
+                    </option>
+                  </select>
+                </div>
+
+                <div class="col-md-6">
+                  <label class="form-label small">Date returned</label>
+                  <input type="date" id="dateReturnedInput" name="DateReturned" class="form-control form-control-sm"
+                          value="{% if data.DateReturned %}{{ data.DateReturned }}{% elif record and record.DateReturned %}{{ record.DateReturned|date:'Y-m-d' }}{% endif %}">
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <div class="bg-white border mb-3">
+            <div class="border-bottom px-3 py-2 fw-semibold">Attachments</div>
+            <div class="p-3">
+
+              <div class="mb-3">
+                <label class="form-label small">
+                  {% if mode == "edit" %}Add attachment(s){% else %}Upload attachment(s){% endif %}
+                </label>
+                <input type="file"
+                       name="files"
+                       class="form-control form-control-sm"
+                       multiple>
+                <div class="form-text">
+                  {% if mode == "create" %}
+                    Files selected here will be uploaded after the record is created.
+                  {% else %}
+                    Files selected here will be uploaded when you save changes.
+                  {% endif %}
+                </div>
+              </div>
+
+              {% if mode == "edit" %}
+                <div class="table-responsive">
+                  <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light">
+                      <tr>
+                        <th>File Name</th>
+                        <th>Uploaded At</th>
+                        <th class="text-end">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for attachment in attachments %}
+                        <tr>
+                          <td>{{ attachment.OriginalFileName }}</td>
+                          <td>{{ attachment.UploadedAt|date:"Y-m-d H:i" }}</td>
+                          <td class="text-end">
+                            <a href="{% url 'records:attachment_download' attachment.AttachmentID %}"
+                               class="btn btn-outline-secondary btn-sm">
+                              Download
+                            </a>
+                            {% if is_admin or is_clerk %}
+                              <a href="{% url 'records:attachment_delete' attachment.AttachmentID %}"
+                                 class="btn btn-outline-danger btn-sm">
+                                Remove
+                              </a>
+                            {% endif %}
+                          </td>
+                        </tr>
+                      {% empty %}
+                        <tr>
+                          <td colspan="3" class="text-center text-muted py-3">
+                            No attachments uploaded yet.
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              {% endif %}
+
+            </div>
+          </div>
+
+          <div class="bg-white border p-3">
+            <div class="d-flex justify-content-end gap-2">
+              <a href="{% url 'records:records_table' %}" class="btn btn-outline-secondary btn-sm">Cancel</a>
+              <button type="submit" class="btn btn-primary btn-sm">
+                {% if mode == "edit" %}Save Changes{% else %}Create Record{% endif %}
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    {% endwith %}
+  </form>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/records.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,204 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Request Details{% endblock %}
+
+{% block content %}
+
+<div class="container py-4">
+
+  <div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+      <h1 class="h5 mb-1">Request #{{ req.RequestID }}</h1>
+      <p class="text-muted small mb-0">
+        Review request details and take action if authorized.
+      </p>
+    </div>
+
+    <a href="{% url 'workflow:requests_list' %}"
+       class="btn btn-outline-secondary btn-sm">
+      Back to Requests
+    </a>
+  </div>
+
+  <div class="bg-white border rounded p-4 mb-4">
+
+    <div class="row mb-3">
+      <div class="col-sm-3 text-muted">Request Type</div>
+      <div class="col-sm-9 fw-medium">
+        {{ req.RequestType|default:"—" }}
+      </div>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col-sm-3 text-muted">Status</div>
+      <div class="col-sm-9">
+        {% if req.Status|lower == "pending" %}
+          <span class="badge text-bg-warning">Pending</span>
+        {% elif req.Status|lower == "approved" %}
+          <span class="badge text-bg-success">Approved</span>
+        {% elif req.Status|lower == "rejected" %}
+          <span class="badge text-bg-danger">Rejected</span>
+        {% else %}
+          <span class="badge text-bg-secondary">{{ req.Status|default:"Unknown" }}</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col-sm-3 text-muted">Requested By</div>
+      <div class="col-sm-9">
+        {{ req.RequestedByUserID|default:"—" }}
+      </div>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col-sm-3 text-muted">Created At</div>
+      <div class="col-sm-9">
+        {{ req.CreatedAt|date:"Y-m-d H:i" }}
+      </div>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col-sm-3 text-muted">Related Record</div>
+      <div class="col-sm-9">
+        {% if req.TargetRecordID %}
+          <a href="{% url 'records:record_detail' req.TargetRecordID.RecordID %}"
+             class="text-decoration-none">
+            {{ req.TargetRecordID.Subject|default:"Record" }} (ID: {{ req.TargetRecordID.RecordID }})
+          </a>
+        {% else %}
+          —
+        {% endif %}
+      </div>
+    </div>
+
+    {# ===================== CORRECTION START ===================== #}
+    {# Replaced raw RequestDetails <pre> block with a structured comparison viewer. #}
+    {# This expects the view to pass a `changes` list like: #}
+    {# [{"field": "...", "old": "...", "new": "...", "changed": True}, ...] #}
+    <div class="row mb-3">
+      <div class="col-sm-3 text-muted">Requested Changes</div>
+      <div class="col-sm-9">
+
+        {% if changes %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Field</th>
+                  <th>Old Value</th>
+                  <th class="text-center"></th>
+                  <th>New Value</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in changes %}
+                  {% if item.changed %}
+                    <tr class="table-light">
+                      <td class="fw-medium">
+                        {{ item.field }}
+                        {# CORRECTION: show Changed badge only for fields that actually changed #}
+                        <span class="badge text-bg-light border ms-1">Changed</span>
+                      </td>
+
+                      <td>
+                        {# CORRECTION: old value muted + strike-through for changed rows #}
+                        <span class="text-muted">
+                          {{ item.old }}
+                        </span>
+                      </td>
+
+                      <td class="text-center">
+                        {# CORRECTION: arrow color changes with request status #}
+                        <i class="bi bi-arrow-right
+                          {% if req.Status|lower == 'approved' %}
+                            text-success
+                          {% elif req.Status|lower == 'rejected' %}
+                            text-danger
+                          {% else %}
+                            text-secondary
+                          {% endif %}
+                        "></i>
+                      </td>
+
+                      <td>
+                        {# CORRECTION: new value gets status-based highlight #}
+                        {% if req.Status|lower == "approved" %}
+                          <span class="fw-semibold text-success bg-success-subtle px-2 py-1 rounded">
+                            {{ item.new }}
+                          </span>
+                        {% elif req.Status|lower == "rejected" %}
+                          <span class="fw-semibold text-danger bg-danger-subtle px-2 py-1 rounded">
+                            {{ item.new }}
+                          </span>
+                        {% else %}
+                          <span class="fw-semibold bg-light px-2 py-1 rounded">
+                            {{ item.new }}
+                          </span>
+                        {% endif %}
+                      </td>
+                    </tr>
+                  {% endif %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          {# CORRECTION: if parsed changes exist but none actually changed, show a friendly message #}
+          {% if not changes|length %}
+            <div class="text-muted">No field changes available.</div>
+          {% endif %}
+
+        {% else %}
+          {# CORRECTION: fallback to raw RequestDetails for delete requests / old requests / unparsed requests #}
+          <pre class="mb-0" style="white-space:pre-wrap;">{{ req.RequestDetails|default:"—" }}</pre>
+        {% endif %}
+
+      </div>
+    </div>
+    {# ====================== CORRECTION END ====================== #}
+
+    <div class="row mb-3">
+      <div class="col-sm-3 text-muted">Reviewed By</div>
+      <div class="col-sm-9">
+        {{ req.ReviewedByUserID|default:"—" }}
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-sm-3 text-muted">Reviewed At</div>
+      <div class="col-sm-9">
+        {{ req.ReviewedAt|date:"Y-m-d H:i"|default:"—" }}
+      </div>
+    </div>
+
+  </div>
+
+  {% if is_admin and req.Status|lower == "pending" %}
+    <div class="bg-white border rounded p-4">
+      <h2 class="h6 mb-3">Admin Actions</h2>
+
+      <div class="d-flex gap-2">
+        <form method="post"
+              action="{% url 'workflow:request_approve' req.RequestID %}"
+              class="d-inline">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-outline-success btn-sm">Approve</button>
+        </form>
+
+        <a href="{% url 'workflow:request_reject' req.RequestID %}"
+           class="btn btn-outline-danger btn-sm">
+          Reject
+        </a>
+      </div>
+    </div>
+  {% endif %}
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/workflow.js' %}"></script>
+{% endblock %}

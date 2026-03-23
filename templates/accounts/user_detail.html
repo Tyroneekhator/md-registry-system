@@ -1,0 +1,114 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}User Detail{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+      <h1 class="h5 mb-1">
+        {{ viewed_user.FullName|default:viewed_user.Username|default:"User Detail" }}
+      </h1>
+      <p class="text-muted small mb-0">
+        View user information and assigned groups.
+      </p>
+    </div>
+
+    <div class="d-flex gap-2">
+      <a href="{% url 'accounts:users_list' %}" class="btn btn-outline-secondary btn-sm">
+        Back to Users
+      </a>
+
+      {% if is_admin %}
+        <a href="{% url 'accounts:user_edit' viewed_user.UserID %}" class="btn btn-outline-primary btn-sm">
+          Edit
+        </a>
+
+        <form method="post"
+              action="{% url 'accounts:user_disable' viewed_user.UserID %}"
+              class="d-inline">
+          {% csrf_token %}
+          {% if viewed_user.is_active %}
+            <button type="submit" class="btn btn-outline-danger btn-sm">
+              Disable
+            </button>
+          {% else %}
+            <button type="submit" class="btn btn-outline-success btn-sm">
+              Enable
+            </button>
+          {% endif %}
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="bg-white border rounded p-4 mb-4">
+    <h2 class="h6 mb-3">User Information</h2>
+
+    <div class="row mb-3">
+      <div class="col-sm-4 text-muted">Username</div>
+      <div class="col-sm-8">{{ viewed_user.Username|default:"—" }}</div>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col-sm-4 text-muted">Full Name</div>
+      <div class="col-sm-8">{{ viewed_user.FullName|default:"—" }}</div>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col-sm-4 text-muted">Email</div>
+      <div class="col-sm-8">{{ viewed_user.Email|default:"—" }}</div>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col-sm-4 text-muted">Status</div>
+      <div class="col-sm-8">
+        {% if viewed_user.is_active %}
+          <span class="badge text-bg-success">Active</span>
+        {% else %}
+          <span class="badge text-bg-secondary">Disabled</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col-sm-4 text-muted">Created At</div>
+      <div class="col-sm-8">
+        {% if viewed_user.CreatedAt %}
+          {{ viewed_user.CreatedAt|date:"Y-m-d H:i" }}
+        {% else %}
+          —
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-sm-4 text-muted">Updated At</div>
+      <div class="col-sm-8">
+        {% if viewed_user.UpdatedAt %}
+          {{ viewed_user.UpdatedAt|date:"Y-m-d H:i" }}
+        {% else %}
+          —
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="bg-white border rounded p-4">
+    <h2 class="h6 mb-3">Assigned Groups</h2>
+
+    {% if groups %}
+      <div class="d-flex flex-wrap gap-2">
+        {% for group in groups %}
+          <span class="badge text-bg-light border">{{ group.GroupName }}</span>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-muted">No groups assigned.</div>
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

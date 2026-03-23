@@ -1,0 +1,46 @@
+<header class="corp-topbar">
+  <div class="corp-topbar-left">
+    <a href="{% url 'records:home' %}" class="corp-page-title text-decoration-none text-reset">
+      {% block page_title %}MD Registry{% endblock %}
+    </a>
+
+    <div class="corp-breadcrumbs">
+      {% block breadcrumbs %}{% endblock %}
+    </div>
+  </div>
+
+  <div class="corp-topbar-right d-flex align-items-center gap-2">
+    {% if is_admin %}
+      <span class="badge corp-role-badge bg-corp-admin">Admin</span>
+
+    {% elif is_clerk %}
+      <span class="badge corp-role-badge bg-corp-clerk">Clerk</span>
+
+    {% elif is_viewer %}
+      <span class="badge corp-role-badge bg-corp-viewer">Viewer</span>
+
+    {% else %}
+      <span class="badge corp-role-badge bg-secondary">User</span>
+    {% endif %}
+
+    <div class="dropdown">
+      <button class="btn btn-sm btn-outline-secondary dropdown-toggle"
+              type="button" data-bs-toggle="dropdown" aria-expanded="false">
+        <i class="bi bi-person-circle me-1"></i>
+        Profile
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><a class="dropdown-item" href="{% url 'accounts:profile' %}">My Profile</a></li>
+        <li><hr class="dropdown-divider"></li>
+        <li>
+          <form method="post" action="{% url 'accounts:logout' %}" class="px-3 py-1">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-outline-danger w-100">
+              <i class="bi bi-box-arrow-right me-1"></i> Logout
+            </button>
+          </form>
+        </li>
+      </ul>
+    </div>
+  </div>
+</header>

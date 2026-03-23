@@ -1,0 +1,140 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{# ---------------------------------------------------- #}
+{# Dynamic Page Title                                   #}
+{# ---------------------------------------------------- #}
+{% block title %}
+    {% if mode == "edit" %}Edit Department{% else %}Create Department{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<div class="container py-4">
+
+    <!-- ================================================= -->
+    <!-- Page Header                                        -->
+    <!-- ================================================= -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h5 mb-1">
+                {% if mode == "edit" %}Edit Department{% else %}Create Department{% endif %}
+            </h1>
+            <p class="text-muted small mb-0">
+                {% if mode == "edit" %}
+                    Update department details.
+                {% else %}
+                    Add a new department to the system.
+                {% endif %}
+            </p>
+        </div>
+
+        <!-- Back Button -->
+        <a href="{% url 'organization:departments_list' %}"
+           class="btn btn-outline-secondary btn-sm">
+            Back to List
+        </a>
+    </div>
+
+    <!-- ================================================= -->
+    <!-- Department Details (VIEW SECTION STYLE)            -->
+    <!-- ================================================= -->
+    <div class="bg-white border rounded p-4 mb-3">
+
+        <div class="row mb-3">
+            <div class="col-sm-3 text-muted">Department Name</div>
+            <div class="col-sm-9">
+                {% if mode == "edit" %}
+                    <input type="text"
+                           name="name"
+                           form="dept-form"
+                           class="form-control form-control-sm"
+                           value="{{ department.DepartmentName }}"
+                           placeholder="Enter department name"
+                           required>
+                    <div class="form-text">Must be unique.</div>
+                {% else %}
+                    <input type="text"
+                           name="name"
+                           form="dept-form"
+                           class="form-control form-control-sm"
+                           value=""
+                           placeholder="Enter department name"
+                           required>
+                    <div class="form-text">Must be unique.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-sm-3 text-muted">Description</div>
+            <div class="col-sm-9">
+                <textarea name="description"
+                          form="dept-form"
+                          rows="3"
+                          class="form-control form-control-sm"
+                          placeholder="Optional description">{% if mode == "edit" %}{{ department.Description|default:'' }}{% endif %}</textarea>
+            </div>
+        </div>
+
+        <div class="row mb-0">
+            <div class="col-sm-3 text-muted">Creation Date</div>
+            <div class="col-sm-9">
+                {% if mode == "edit" and department.CreatedAt %}
+                    {{ department.CreatedAt|date:"Y-m-d H:i" }}
+                {% elif mode == "edit" %}
+                    <span class="text-muted">—</span>
+                {% else %}
+                    <span class="text-muted">Will be set automatically after creation.</span>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ================================================= -->
+    <!-- Form Card (Actions + Messages)                     -->
+    <!-- ================================================= -->
+    <div class="bg-white border rounded p-4">
+
+        <!-- Display Django Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags|default:'info' }} small">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Department Form -->
+        <form id="dept-form" method="POST">
+            {% csrf_token %}
+
+            <!-- Action Buttons -->
+            <div class="d-flex justify-content-end gap-2">
+
+                <!-- Cancel -->
+                <a href="{% url 'organization:departments_list' %}"
+                   class="btn btn-outline-secondary btn-sm">
+                    Cancel
+                </a>
+
+                <!-- Submit -->
+                <button type="submit"
+                        class="btn btn-outline-primary btn-sm">
+                    {% if mode == "edit" %}Save Changes{% else %}Create Department{% endif %}
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/organization.js' %}"></script>
+{% endblock %}

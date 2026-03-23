@@ -1,0 +1,261 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Deleted Records{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h5 mb-1 fw-bold">Deleted Records</h1>
+      <p class="text-muted small mb-0">
+        View soft-deleted records and restore or permanently delete them.
+      </p>
+    </div>
+
+    <a href="{% url 'records:records_table' %}" class="btn btn-outline-secondary btn-sm">
+      Back to Records
+    </a>
+  </div>
+
+  <!-- Search -->
+  <div class="bg-white border rounded p-3 mb-3">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-8">
+        <label class="form-label small mb-1">Search</label>
+        <input type="text" class="form-control form-control-sm" name="q" value="{{ q|default:'' }}"
+                placeholder="Invoice, messenger, subject, description...">
+      </div>
+      {% if is_clerk %}
+      <div class="col-md-3">
+        <label class="form-label small mb-1">Request Status</label>
+        <select name="request_state" class="form-select form-select-sm">
+            <option value="">All</option>
+            <option value="restore_requested"
+                    {% if request_state == "restore_requested" %}selected{% endif %}>
+                    Restore Requested
+            </option>
+            <option value="permanent_delete_requested"
+              {% if request_state == "permanent_delete_requested" %}selected{% endif %}>
+              Permanent Delete Requested
+            </option>
+        </select>
+      </div>
+      {% endif %}
+      <div class="col-md-4 d-flex gap-2">
+        <button class="btn btn-outline-secondary btn-sm w-50" type="submit">Search</button>
+        <a class="btn btn-outline-secondary btn-sm w-50" href="{% url 'workflow:deleted_records_list' %}">Reset</a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Table -->
+  <div class="bg-white border rounded p-0">
+    <div class="bg-white border-bottom px-3 py-2 d-flex flex-wrap align-items-center gap-2">
+      <div class="small text-muted">
+        Selected: <span id="selectedDeletedRecordsCount">0</span>
+      </div>
+      {% if is_admin %}
+        <form id="bulkRestoreDeletedForm"
+              method="post"
+              action="{% url 'workflow:bulk_restore_deleted_records' %}"
+              class="d-inline">
+          {% csrf_token %}
+          <div id="bulkRestoreDeletedHiddenInputs"></div>
+          <button type="submit"
+              id="bulkRestoreDeletedBtn"
+              class="btn btn-outline-success btn-sm"
+              disabled>
+              Restore Selected
+          </button>
+        </form>
+        <form id="bulkPermanentDeleteForm"
+              method="post"
+              action="{% url 'workflow:bulk_permanent_delete_records' %}"
+              class="d-inline">
+        {% csrf_token %}
+        <div id="bulkPermanentDeleteHiddenInputs"></div>
+        <button type="submit" 
+                id="bulkPermanentDeleteBtn"
+                class="btn btn-outline-danger btn-sm"
+                disabled>
+          Permanent Delete Selected
+          </button>
+        </form>
+      {% elif is_clerk %}
+        <form id="bulkRestoreDeletedForm"
+                method="post"
+                action="{% url 'workflow:bulk_restore_deleted_records' %}"
+                class="d-inline">
+          {% csrf_token %}
+          <div id="bulkRestoreDeletedHiddenInputs"></div>
+          <button type="submit"
+                  id="bulkRestoreDeletedBtn"
+                  class="btn btn-outline-success btn-sm"
+                  disabled>
+            Request Restore Selected
+          </button>
+        </form>
+        <form id="bulkPermanentDeleteForm"
+              method="post"
+              action="{% url 'workflow:bulk_permanent_delete_records' %}"
+              class="d-inline">
+          {% csrf_token %}
+          <div id="bulkPermanentDeleteHiddenInputs"></div>
+          <button type="submit"
+                  id="bulkPermanentDeleteBtn"
+                  class="btn btn-outline-warning btn-sm"
+                  disabled>
+            Request Permanent Delete Selected
+          </button>
+        </form>
+      {% endif %}
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            {% if is_admin or is_clerk %}
+              <th style="width: 42px;">
+                <input type="checkbox"
+                        id="selectAllDeletedRecords"
+                        class="form-check-input"
+                        aria-label="Select all deleted records">
+              </th>
+            {% endif %}
+            <th>Invoice</th>
+            <th>Messenger</th>
+            <th>Subject</th>
+            <th>Incoming Dept</th>
+            <th>Date Received</th>
+            <th>Status</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for record in records %}
+            <tr>
+              {% if is_admin or is_clerk %}
+                <td>
+                    <input  type="checkbox"
+                            class="form-check-input deleted-record-select-checkbox"
+                            value="{{ record.RecordID }}"
+                            aria-label="Select deleted record {{ record.RecordID }}">
+                </td>
+              {% endif %}
+              <td class="fw-semibold">{{ record.InvoiceNumber }}</td>
+              <td>{{ record.MessengerName }}</td>
+              <td>
+                <a href="{% url 'records:record_detail' record.RecordID %}" class="text-decoration-none">
+                  {{ record.Subject }}
+                </a>
+              </td>
+              <td>
+                {% if record.IncomingDepartmentID %}
+                  {{ record.IncomingDepartmentID.DepartmentName }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+              <td>{{ record.DateReceived|date:"Y-m-d H:i" }}</td>
+              <td>
+                {% if record.Status == "With MD" %}
+                  <span class="badge text-bg-primary">With MD</span>
+                {% elif record.Status == "Not with MD" %}
+                  <span class="badge text-bg-warning">Not with MD</span>
+                {% else %}
+                  <span class="badge text-bg-light text-dark">{{ record.Status }}</span>
+                {% endif %}
+              </td>
+
+              <td class="text-end">
+                <div class="d-inline-flex gap-2 justify-content-end">
+
+                  {# CORRECTION: admin keeps direct restore action #}
+                  {% if is_admin %}
+                    <form method="post" action="{% url 'workflow:record_restore' record.RecordID %}" class="d-inline">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-sm btn-outline-success">
+                        Restore
+                      </button>
+                    </form>
+
+                    <form method="post" action="{% url 'workflow:record_permanent_delete' record.RecordID %}" class="d-inline">
+                      {% csrf_token %}
+                      <button type="submit"
+                              class="btn btn-sm btn-outline-danger"
+                              onclick="return confirm('Permanently delete this record? This cannot be undone.');">
+                        Permanent Delete
+                      </button>
+                    </form>
+
+                  {# CORRECTION: clerk now sends restore request instead of restoring directly #}
+                  {% elif is_clerk %}
+                    <a href="{% url 'records:record_detail' record.RecordID %}"
+                    class="btn btn-sm btn-outline-secondary">
+                        View
+                    </a>
+
+                    {% with pending_restore=record.pending_restore_request %}
+                      {% if pending_restore %}
+                        <a href="{% url 'workflow:request_detail' pending_restore.RequestID %}"
+                          class="btn btn-sm btn-outline-warning">
+                          Restore Requested
+                        </a>
+                      {% else %}
+                        <form method="post" action="{% url 'workflow:record_restore_request' record.RecordID %}" class="d-inline">
+                          {% csrf_token %}
+                          <button type="submit" class="btn btn-sm btn-outline-success">
+                            Request Restore
+                          </button>
+                        </form>
+                      {% endif %}
+                    {% endwith %}
+
+                    {% with pending_permanent_delete=record.pending_permanent_delete_request %}
+                        {% if pending_permanent_delete %}
+                          <a href="{% url 'workflow:request_detail' pending_permanent_delete.RequestID %}"
+                              class="btn btn-sm btn-outline-warning">
+                              Permanent Delete Requested
+                          </a>
+                        {% else %}
+                          <form method="post"
+                                action="{% url 'workflow:record_permanent_delete_request' record.RecordID %}"
+                                class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit"
+                                    class="btn btn-sm btn-outline-danger"
+                                    onclick="return confirm('Submit permanent delete request for admin approval? This cannot be undone once approved.');">
+                              Request Permanent Delete
+                            </button>
+                          </form>
+                        {% endif %}
+                      {% endwith %}
+                  {% endif %}
+
+                </div>
+              </td>
+            </tr>
+
+          {% empty %}
+            <tr>
+              <td colspan="{% if is_admin or is_clerk %}8{% else %}7{% endif %}" class="text-center text-muted py-4">
+                No deleted records found.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/workflow.js' %}"></script>
+{% endblock %}

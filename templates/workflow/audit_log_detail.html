@@ -1,0 +1,94 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Audit Log Detail{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h5 mb-1">Audit Entry #{{ log.AuditLogID }}</h1>
+            <p class="text-muted small mb-0">
+                Detailed view of a single audit record (Admin only).
+            </p>
+        </div>
+
+        <a href="{% url 'workflow:audit_logs_list' %}"
+            class="btn btn-outline-secondary btn-sm">
+            Back to Logs
+        </a>
+    </div>
+
+    <div class="bg-white border rounded p-4">
+
+        <div class="row mb-3">
+            <div class="col-sm-3 text-muted">Time</div>
+            <div class="col-sm-9">
+                {% if log.EventTime %}
+                    {{ log.EventTime|date:"Y-m-d H:i:s" }}
+                {% else %}
+                    —
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-sm-3 text-muted">User</div>
+            <div class="col-sm-9">
+                {% if log.ActorUserID %}
+                    {{ log.ActorUserID.Username }}
+                {% else %}
+                    —
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-sm-3 text-muted">Action</div>
+            <div class="col-sm-9 fw-medium">
+                {{ log.EventType|default:"—" }}
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-sm-3 text-muted">Target Record</div>
+            <div class="col-sm-9">
+                {% if log.TargetRecordID %}
+                    {{ log.TargetRecordID.RecordID }}
+                {% else %}
+                    —
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-sm-3 text-muted">Target Request</div>
+            <div class="col-sm-9">
+                {% if log.TargetRequestID %}
+                    {{ log.TargetRequestID.RequestID }}
+                {% else %}
+                    —
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-3 text-muted">Details</div>
+            <div class="col-sm-9">
+                {% if log.Details %}
+                    <pre class="mb-0 small bg-light border rounded p-3">{{ log.Details }}</pre>
+                {% else %}
+                    <span class="text-muted">—</span>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/audit.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}External Company Detail{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h5 mb-1">{{ company.CompanyName }}</h1>
+            <p class="text-muted small mb-0">
+                View external company details.
+            </p>
+        </div>
+
+        <div class="d-flex gap-2">
+            <a href="{% url 'organization:external_companies_list' %}"
+               class="btn btn-outline-secondary btn-sm">
+                Back to External Companies
+            </a>
+
+            {% if is_admin %}
+            <a href="{% url 'organization:external_company_edit' company.ExternalCompanyNameID %}"
+               class="btn btn-outline-primary btn-sm">
+                Edit
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="bg-white border rounded p-4">
+
+        <div class="row mb-3">
+            <div class="col-sm-3 text-muted">Company ID</div>
+            <div class="col-sm-9">{{ company.ExternalCompanyNameID }}</div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-sm-3 text-muted">Company Name</div>
+            <div class="col-sm-9">{{ company.CompanyName }}</div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-sm-3 text-muted">Description</div>
+            <div class="col-sm-9">{{ company.Description|default:"—" }}</div>
+        </div>
+
+        <div class="row mb-3">
+            <div class="col-sm-3 text-muted">Created At</div>
+            <div class="col-sm-9">
+                {% if company.CreatedAt %}
+                    {{ company.CreatedAt|date:"Y-m-d H:i" }}
+                {% else %}
+                    —
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-sm-3 text-muted">Updated At</div>
+            <div class="col-sm-9">
+                {% if company.UpdatedAt %}
+                    {{ company.UpdatedAt|date:"Y-m-d H:i" }}
+                {% else %}
+                    —
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

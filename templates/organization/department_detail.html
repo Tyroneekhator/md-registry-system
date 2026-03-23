@@ -1,0 +1,98 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Department Details{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <!-- ================================================= -->
+  <!-- Page Header                                       -->
+  <!-- ================================================= -->
+  <div class="d-flex justify-content-between align-items-start mb-3">
+    <div>
+      <h1 class="h5 mb-1">{{ department.DepartmentName }}</h1>
+      <p class="text-muted small mb-0">
+        Department information and summary statistics.
+      </p>
+    </div>
+
+    <div class="d-flex gap-2">
+      <a href="{% url 'organization:departments_list' %}" class="btn btn-outline-secondary btn-sm">
+        Back
+      </a>
+
+      {% if is_admin %}
+        <a href="{% url 'organization:department_edit' department.DepartmentID %}" class="btn btn-outline-primary btn-sm">
+          Edit
+        </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ================================================= -->
+  <!-- Department Info Card                              -->
+  <!-- ================================================= -->
+  <div class="bg-white border rounded p-4 mb-4">
+
+    <div class="row mb-3">
+      <div class="col-sm-3 text-muted">Department Name</div>
+      <div class="col-sm-9">{{ department.DepartmentName|default:"—" }}</div>
+    </div>
+
+    <div class="row mb-3">
+      <div class="col-sm-3 text-muted">Description</div>
+      <div class="col-sm-9">
+        {{ department.Description|default:"—" }}
+      </div>
+    </div>
+
+    <div class="row mb-0">
+      <div class="col-sm-3 text-muted">Creation Date</div>
+      <div class="col-sm-9">
+        {% if department.CreatedAt %}
+          {{ department.CreatedAt|date:"Y-m-d H:i" }}
+        {% else %}
+          <span class="text-muted">—</span>
+        {% endif %}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ================================================= -->
+  <!-- Optional Statistics Section                       -->
+  <!-- ================================================= -->
+  {% if stats %}
+    <div class="row g-3">
+
+      <div class="col-md-4">
+        <div class="bg-white border rounded p-4">
+          <div class="text-muted small mb-1">Total Records</div>
+          <div class="h4 mb-0">{{ stats.total_records|default:"0" }}</div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="bg-white border rounded p-4">
+          <div class="text-muted small mb-1">Active Records</div>
+          <div class="h4 mb-0">{{ stats.active_records|default:"0" }}</div>
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="bg-white border rounded p-4">
+          <div class="text-muted small mb-1">Deleted Records</div>
+          <div class="h4 mb-0">{{ stats.deleted_records|default:"0" }}</div>
+        </div>
+      </div>
+
+    </div>
+  {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/organization.js' %}"></script>
+{% endblock %}

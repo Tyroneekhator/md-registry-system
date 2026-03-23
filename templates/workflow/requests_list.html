@@ -1,0 +1,217 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Requests{% endblock %}
+
+{% block content %}
+
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h5 mb-1">Action Requests</h1>
+            <p class="text-muted small mb-0">
+                Track and manage approval requests (delete/restore/changes).
+            </p>
+        </div>
+
+        {% if is_clerk %}
+            <a href="{% url 'workflow:request_create' %}"
+               class="btn btn-outline-primary btn-sm">
+                + New Request
+            </a>
+        {% endif %}
+    </div>
+
+    <!-- ===================================================== -->
+    <!-- FIXED: role-based scope display only                  -->
+    <!-- ===================================================== -->
+    <div class="mb-2">
+        <h6 class="mb-0">
+            {% if is_admin %}
+                All Requests
+            {% elif is_clerk %}
+                My Requests
+            {% endif %}
+        </h6>
+    </div>
+
+    <div class="bg-white border rounded p-3 mb-3">
+        <form method="GET" class="row g-2 align-items-end">
+
+            <div class="col-md-3">
+                <label class="form-label small">Status</label>
+                <select name="status" class="form-select form-select-sm">
+                    <option value="" {% if not status %}selected{% endif %}>All</option>
+                    <option value="pending" {% if status == "pending" %}selected{% endif %}>Pending</option>
+                    <option value="approved" {% if status == "approved" %}selected{% endif %}>Approved</option>
+                    <option value="rejected" {% if status == "rejected" %}selected{% endif %}>Rejected</option>
+                </select>
+            </div>
+
+            <!-- ===================================================== -->
+            <!-- FIXED: removed editable scope dropdown                -->
+            <!-- ===================================================== -->
+            <div class="col-md-3">
+                <label class="form-label small">Scope</label>
+
+                {% if is_admin %}
+                    <input type="hidden" name="scope" value="all">
+                    <div class="form-control form-control-sm bg-light">
+                        All Requests
+                    </div>
+
+                {% elif is_clerk %}
+                    <input type="hidden" name="scope" value="mine">
+                    <div class="form-control form-control-sm bg-light">
+                        My Requests
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- ===================================================== -->
+            <!-- NEW: admin-only clerk filter                          -->
+            <!-- ===================================================== -->
+            {% if is_admin %}
+                <div class="col-md-3">
+                    <label class="form-label small">Clerk</label>
+                    <select name="clerk_id" class="form-select form-select-sm">
+                        <option value="" {% if not clerk_id %}selected{% endif %}>All Clerks</option>
+                        {% for clerk in clerks %}
+                            <option value="{{ clerk.UserID }}"
+                                    {% if clerk_id == clerk.UserID|stringformat:"s" %}selected{% endif %}>
+                                {{ clerk.Username }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
+
+            <div class="{% if is_admin %}col-md-3{% else %}col-md-4{% endif %}">
+                <label class="form-label small">Search</label>
+                <input type="text"
+                       name="q"
+                       value="{{ q }}"
+                       class="form-control form-control-sm"
+                       placeholder="Request type / details / requester">
+            </div>
+
+            <div class="col-md-2 text-end">
+                <button type="submit" class="btn btn-outline-secondary btn-sm">
+                    Filter
+                </button>
+
+                <a href="{% url 'workflow:requests_list' %}"
+                   class="btn btn-outline-secondary btn-sm">
+                    Reset
+                </a>
+            </div>
+
+        </form>
+    </div>
+
+    <div class="bg-white border rounded p-0">
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th>Type</th>
+                        <th>Record</th>
+                        <th>Requested By</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {% for req in requests %}
+                        <tr>
+
+                            <td class="text-muted">#{{ req.RequestID }}</td>
+
+                            <td class="fw-medium">
+                                {{ req.RequestType|default:"—" }}
+                            </td>
+
+                            <td>
+                                {% if req.TargetRecordID %}
+                                    <a href="{% url 'records:record_detail' req.TargetRecordID.RecordID %}"
+                                       class="text-decoration-none">
+                                        {{ req.TargetRecordID.title|default:"Record" }}
+                                    </a>
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {{ req.RequestedByUserID.Username|default:"—" }}
+                            </td>
+
+                            <td>
+                                {% if req.Status|lower == "pending" %}
+                                    <span class="badge text-bg-warning">Pending</span>
+                                {% elif req.Status|lower == "approved" %}
+                                    <span class="badge text-bg-success">Approved</span>
+                                {% elif req.Status|lower == "rejected" %}
+                                    <span class="badge text-bg-danger">Rejected</span>
+                                {% else %}
+                                    <span class="badge text-bg-secondary">{{ req.Status|default:"Unknown" }}</span>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                {{ req.CreatedAt|date:"Y-m-d" }}
+                            </td>
+
+                            <td class="text-end">
+
+                                <a href="{% url 'workflow:request_detail' req.RequestID %}"
+                                   class="btn btn-outline-secondary btn-sm">
+                                    View
+                                </a>
+
+                                {% if is_admin and req.Status|lower == "pending" %}
+                                    <form method="post"
+                                          action="{% url 'workflow:request_approve' req.RequestID %}"
+                                          class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-outline-success btn-sm">
+                                            Approve
+                                        </button>
+                                    </form>
+
+                                    <a href="{% url 'workflow:request_reject' req.RequestID %}"
+                                       class="btn btn-outline-danger btn-sm">
+                                        Reject
+                                    </a>
+                                {% endif %}
+
+                            </td>
+
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">
+                                No requests found.
+                            </td>
+                        </tr>
+                    {% endfor %}
+
+                </tbody>
+
+            </table>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/workflow.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,109 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <div class="mb-4">
+    <h1 class="h5 mb-1 fw-bold">Dashboard</h1>
+    <p class="text-muted small mb-0">Overview of records and system activity.</p>
+  </div>
+
+  <!-- KPI Cards -->
+  <div class="row g-3 mb-4">
+
+    <div class="col-md-4">
+      <div class="bg-white border p-4">
+        <div class="text-muted small mb-1">Total Records(Both Present and Soft-deleted)</div>
+        <div class="h4 mb-0">{{ total_records|default:"0" }}</div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="bg-white border p-4">
+        <div class="text-muted small mb-1">Present Records</div>
+        <div class="h4 mb-0">{{ active_records|default:"0" }}</div>
+      </div>
+    </div>
+
+    <div class="col-md-4">
+      <div class="bg-white border p-4">
+        <div class="text-muted small mb-1">Deleted Records</div>
+        <div class="h4 mb-0">{{ deleted_records|default:"0" }}</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Recent Records -->
+  <div class="bg-white border mb-4">
+    <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
+      <h2 class="h6 mb-0 fw-semibold">Recent Records</h2>
+
+      <a href="{% url 'records:records_table' %}" class="btn btn-outline-secondary btn-sm">
+        View All
+      </a>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Subject</th>
+            <th>Incoming Dept</th>
+            <th>Status</th>
+            <th>Date Received</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {% for record in recent_records %}
+            <tr>
+              <td>
+                <a href="{% url 'records:record_detail' record.RecordID %}"
+                   class="text-decoration-none fw-semibold">
+                  {{ record.Subject }}
+                </a>
+              </td>
+
+              <td>
+                {% if record.IncomingDepartmentID %}
+                  {{ record.IncomingDepartmentID.DepartmentName }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+
+              <td>
+                {% if record.Status == "With MD" %}
+                  <span class="badge text-bg-primary">With MD</span>
+                {% elif record.Status == "Not with MD" %}
+                  <span class="badge text-bg-warning">Not with MD</span>
+                {% else %}
+                  <span class="badge text-bg-light text-dark">{{ record.Status }}</span>
+                {% endif %}
+              </td>
+
+              <td>{{ record.DateReceived|date:"Y-m-d H:i" }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4" class="text-center text-muted py-4">
+                No recent records found.
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+
+      </table>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/records.js' %}"></script>
+{% endblock %}

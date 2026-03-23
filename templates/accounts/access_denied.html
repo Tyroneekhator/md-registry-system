@@ -1,0 +1,56 @@
+{% extends "base/base.html" %}
+
+{# ---------------------------------------------------- #}
+{# Page Title (appears in browser tab)                 #}
+{# ---------------------------------------------------- #}
+{% block title %}Access Denied{% endblock %}
+
+{% block content %}
+
+<!-- Main container with light background spacing -->
+<div class="container py-4">
+
+    <!-- Center the card horizontally -->
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+
+            <!-- White card with border and rounded corners -->
+            <div class="bg-white border rounded p-4 text-center">
+
+                <!-- Heading -->
+                <h1 class="h4 text-danger mb-3">
+                    Access Denied
+                </h1>
+
+                <!-- Explanation text -->
+                <p class="text-muted mb-4">
+                    You do not have permission to access this page.
+                    <br>
+                    If you believe this is an error, please contact your system administrator.
+                </p>
+
+                <!-- Action Buttons -->
+                <div class="d-flex justify-content-center gap-2">
+
+                    <!-- Go back to Dashboard -->
+                    <a href="{% url 'records:dashboard' %}" 
+                       class="btn btn-outline-primary btn-sm">
+                        Go to Dashboard
+                    </a>
+
+                    <!-- Browser back button -->
+                    <a href="javascript:history.back()" 
+                       class="btn btn-outline-secondary btn-sm">
+                        Go Back
+                    </a>
+
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

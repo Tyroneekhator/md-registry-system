@@ -1,0 +1,135 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+
+{# ---------------------------------------------------- #}
+{# Page Title                                           #}
+{# ---------------------------------------------------- #}
+{% block title %}My Profile{% endblock %}
+
+{% block content %}
+
+<!-- Main container -->
+<div class="container py-4">
+
+    <!-- Page Header -->
+    <div class="mb-3">
+        <h1 class="h5 mb-1">My Profile</h1>
+        <p class="text-muted small mb-0">
+            View your account information and assigned roles.
+        </p>
+    </div>
+
+    <!-- Profile Card -->
+    <div class="bg-white border rounded p-4">
+
+        <!-- Username -->
+        <div class="row mb-3">
+            <div class="col-sm-3 text-muted">
+                Username
+            </div>
+            <div class="col-sm-9 fw-medium">
+                {{ user_obj.username }}
+            </div>
+        </div>
+
+        <!-- Full Name -->
+        <div class="row mb-3">
+            <div class="col-sm-3 text-muted">
+                Full Name
+            </div>
+            <div class="col-sm-9">
+                {% if user_obj.full_name %}
+                    {{ user_obj.full_name }}
+                {% else %}
+                    —
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Email -->
+        <div class="row mb-3">
+            <div class="col-sm-3 text-muted">
+                Email
+            </div>
+            <div class="col-sm-9">
+                {% if user_obj.email %}
+                    {{ user_obj.email }}
+                {% else %}
+                    —
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Account Status -->
+        <div class="row mb-3">
+            <div class="col-sm-3 text-muted">
+                Account Status
+            </div>
+            <div class="col-sm-9">
+                {% if user_obj.is_active %}
+                    <span class="badge text-bg-success">Active</span>
+                {% else %}
+                    <span class="badge text-bg-danger">Disabled</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Roles -->
+        <div class="row mb-4">
+            <div class="col-sm-3 text-muted">
+                Roles
+            </div>
+            <div class="col-sm-9">
+
+                {% for group in groups %}
+
+                    {% if group.name|lower == "admin" %}
+                        <span class="badge text-bg-danger me-1">Admin</span>
+
+                    {% elif group.name|lower == "clerk" %}
+                        <span class="badge text-bg-primary me-1">Clerk</span>
+
+                    {% elif group.name|lower == "viewer" %}
+                        <span class="badge text-bg-secondary me-1">Viewer</span>
+
+                    {% else %}
+                        <span class="badge text-bg-dark me-1">
+                            {{ group.name }}
+                        </span>
+                    {% endif %}
+
+                {% empty %}
+                    <span class="text-muted">No roles assigned</span>
+                {% endfor %}
+
+            </div>
+        </div>
+
+        <!-- Back Button -->
+        <div class="d-flex justify-content-between">
+
+            <a href="{% url 'records:dashboard' %}"
+               class="btn btn-outline-secondary btn-sm">
+                Back to Dashboard
+            </a>
+
+            {% if is_admin %}
+                <a href="{% url 'accounts:users_list' %}"
+                   class="btn btn-outline-primary btn-sm">
+                    Manage Users
+                </a>
+            {% endif %}
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
+
+
+{% block extra_js %}
+<script src="{% static 'js/accounts.js' %}"></script>
+{% endblock %}

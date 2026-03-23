@@ -1,0 +1,123 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+
+{% block title %}New Request{% endblock %}
+
+{% block content %}
+
+<div class="container py-4">
+
+    <!-- ================================================= -->
+    <!-- Page Header                                        -->
+    <!-- ================================================= -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h5 mb-1">Submit Action Request</h1>
+            <p class="text-muted small mb-0">
+                Submit a request for approval (delete, restore, update).
+            </p>
+        </div>
+
+        <a href="{% url 'workflow:requests_list' %}"
+           class="btn btn-outline-secondary btn-sm">
+            Back to Requests
+        </a>
+    </div>
+
+    <!-- ================================================= -->
+    <!-- Request Form Card                                  -->
+    <!-- ================================================= -->
+    <div class="bg-white border rounded p-4">
+
+        <!-- Display Messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags|default:'info' }} small">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="POST">
+            {% csrf_token %}
+
+            <!-- Request Type -->
+            <div class="mb-3">
+                <label class="form-label">
+                    Request Type <span class="text-danger">*</span>
+                </label>
+
+                <select name="request_type"
+                        class="form-select"
+                        required>
+
+                    <option value="">-- Select Request Type --</option>
+                    <option value="delete">Delete Record</option>
+                    <option value="restore">Restore Record</option>
+                    <option value="edit">Update Record</option>
+
+                </select>
+            </div>
+
+            <!-- Record Selection -->
+            <div class="mb-3">
+                <label class="form-label">
+                    Related Record <span class="text-danger">*</span>
+                </label>
+
+                <select name="record_id"
+                        class="form-select"
+                        required>
+
+                    <option value="">-- Select Record --</option>
+
+                    {% for record in records %}
+                        <option value="{{ record.RecordID }}">
+                            {{ record }}
+                        </option>
+                    {% endfor %}
+
+                </select>
+            </div>
+
+            <!-- Reason / Comment -->
+            <div class="mb-4">
+                <label class="form-label">
+                    Reason / Comment <span class="text-danger">*</span>
+                </label>
+
+                <textarea name="details"
+                          rows="4"
+                          class="form-control"
+                          placeholder="Provide explanation for this request"
+                          required></textarea>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex justify-content-end gap-2">
+
+                <a href="{% url 'workflow:requests_list' %}"
+                   class="btn btn-outline-secondary btn-sm">
+                    Cancel
+                </a>
+
+                <button type="submit"
+                        class="btn btn-outline-primary btn-sm">
+                    Submit Request
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}
+
+
+{% block extra_js %}
+<script src="{% static 'js/workflow.js' %}"></script>
+{% endblock %}

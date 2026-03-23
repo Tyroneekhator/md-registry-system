@@ -1,0 +1,172 @@
+{% load humanize %}
+
+{% for record in records %}
+  <tr>
+
+    {% if is_admin or is_clerk %}
+    <td>
+      <input type="checkbox"
+            class="form-check-input record-select-checkbox"
+            value="{{ record.RecordID }}"
+            aria-label="Select record {{ record.RecordID }}"
+            {% if record.IsDeleted %}disabled{% endif %}>
+    </td>
+    {% endif %}
+
+    <td class="fw-semibold">{{ record.InvoiceNumber|intcomma }}</td>
+    <td>{{ record.MessengerName }}</td>
+    <td>
+      <a class="text-decoration-none" href="{% url 'records:record_detail' record.RecordID %}">
+        {{ record.Subject }}
+      </a>
+      {% if pending_requests_map %}
+        {% for record_id, request_type in pending_requests_map.items %}
+          {% if record_id == record.RecordID %}
+            {% if request_type == "EDIT" %}
+              <span class="badge bg-warning text-dark ms-2">Pending Edit</span>
+            {% elif request_type == "DELETE" %}
+              <span class="badge bg-danger ms-2">Pending Delete</span>
+            {% elif request_type == "RESTORE" %}
+              <span class="badge bg-success ms-2">Pending Restore</span>
+            {% else %}
+              <span class="badge bg-secondary ms-2">Pending Request</span>
+            {% endif %}
+          {% endif %}
+        {% endfor %}
+      {% endif %}
+    </td>
+    <td>
+      {% if record.ExternalCompanyName %}
+        {{ record.ExternalCompanyName.CompanyName }}
+      {% else %}
+        —
+      {% endif %}
+    </td>
+    <td>
+      {% if record.IncomingDepartmentID %}
+        {{ record.IncomingDepartmentID.DepartmentName }}
+      {% else %}
+        —
+      {% endif %}
+    </td>
+    <td>
+      {% if record.OutgoingDepartmentID %}
+        {{ record.OutgoingDepartmentID.DepartmentName }}
+      {% else %}
+        —
+      {% endif %}
+    </td>
+    <td>{{ record.DateReceived|date:"Y-m-d H:i" }}</td>
+    <td>
+      {% if record.DateDispatched %}
+        {{ record.DateDispatched|date:"Y-m-d H:i" }}
+      {% else %}
+        —
+      {% endif %}
+    </td>
+
+    <!-- Returned badge -->
+    <td>
+      {% if record.Returned == "Yes" %}
+        <span class="badge text-bg-success">Yes</span>
+      {% elif record.Returned == "No" %}
+        <span class="badge text-bg-secondary">No</span>
+      {% else %}
+        —
+      {% endif %}
+    </td>
+
+    <td>
+      {% if record.DateReturned %}
+        {{ record.DateReturned|date:"Y-m-d" }}
+      {% else %}
+        —
+      {% endif %}
+    </td>
+
+    <!-- Status badge -->
+    <td>
+      {% if record.Status == "With MD" %}
+        <span class="badge text-bg-primary">With MD</span>
+      {% elif record.Status == "Not with MD" %}
+        <span class="badge text-bg-warning">Not with MD</span>
+      {% else %}
+        <span class="badge text-bg-light text-dark">{{ record.Status }}</span>
+      {% endif %}
+    </td>
+
+
+    <td class="text-end">
+
+      <div class="d-flex justify-content-end gap-2">
+
+        {# ==================== VIEW ==================== #}
+        <a href="{% url 'records:record_detail' record.RecordID %}"
+            class="btn btn-sm btn-outline-primary"
+            title="View Record">
+            <i class="bi bi-eye"></i>
+        </a>
+
+        {% if is_admin %}
+
+          {# ==================== ADMIN EDIT ==================== #}
+          <a href="{% url 'records:record_edit' record.RecordID %}"
+              class="btn btn-sm btn-outline-secondary"
+              title="Edit Record">
+            <i class="bi bi-pencil"></i>
+          </a>
+
+          {% if not record.IsDeleted %}
+          {# ==================== ADMIN DELETE ==================== #}
+          <form method="post"
+                action="{% url 'records:record_soft_delete' record.RecordID %}"
+                class="d-inline">
+            {% csrf_token %}
+            <button type="submit"
+                    class="btn btn-sm btn-outline-danger"
+                    title="Delete Record"
+                    onclick="return confirm('Delete this record?');">
+              <i class="bi bi-trash"></i>
+            </button>
+          </form>
+          {% endif %}
+
+        {% elif is_clerk %}
+
+          {# ==================== CLERK REQUEST EDIT ==================== #}
+          <a href="{% url 'records:record_edit' record.RecordID %}"
+              class="btn btn-sm btn-outline-warning"
+              title="Request Edit (Admin approval required)">
+            <i class="bi bi-pencil-square"></i>
+          </a>
+
+          {% if not record.IsDeleted %}
+          {# ==================== CLERK REQUEST DELETE ==================== #}
+          <form method="post"
+                action="{% url 'records:record_soft_delete' record.RecordID %}"
+                class="d-inline">
+            {% csrf_token %}
+            <button type="submit"
+                    class="btn btn-sm btn-outline-warning"
+                    title="Request Delete (Admin approval required)"
+                    onclick="return confirm('Submit delete request for admin approval?');">
+              <i class="bi bi-send"></i>
+            </button>
+          </form>
+          {% endif %}
+
+        {% endif %}
+
+      </div>
+
+    </td>
+  </tr>
+
+{% empty %}
+  <tr>
+    <td colspan="{% if is_admin or is_clerk %}13{% else %}12{% endif %}"
+    class="text-center text-muted py-4">
+      No records found.
+    </td>
+  </tr>
+{% endfor %}

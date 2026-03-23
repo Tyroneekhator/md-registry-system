@@ -1,0 +1,89 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Reject Request{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between align-items-start mb-3">
+        <div>
+            <h1 class="h5 mb-1">Reject Request #{{ req.RequestID }}</h1>
+            <p class="text-muted small mb-0">
+                Provide a reason for rejection.
+            </p>
+        </div>
+
+        <a href="{% url 'workflow:request_detail' req.RequestID %}"
+           class="btn btn-outline-secondary btn-sm">
+            Back to Request
+        </a>
+    </div>
+
+    <div class="bg-white border rounded p-4">
+
+        <div class="mb-3">
+            <div class="small text-muted">Request Type</div>
+            <div class="fw-medium">{{ req.RequestType }}</div>
+        </div>
+
+        <div class="mb-3">
+            <div class="small text-muted">Related Record</div>
+            <div>
+                {% if req.TargetRecordID %}
+                    <a href="{% url 'records:record_detail' req.TargetRecordID.RecordID %}"
+                       class="text-decoration-none">
+                        Record #{{ req.TargetRecordID.RecordID }}
+                    </a>
+                {% else %}
+                    —
+                {% endif %}
+            </div>
+        </div>
+
+        <hr>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags|default:'info' }} small">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <form method="POST">
+            {% csrf_token %}
+
+            <div class="mb-4">
+                <label class="form-label">
+                    Rejection Reason <span class="text-danger">*</span>
+                </label>
+
+                <textarea name="reason"
+                          rows="4"
+                          class="form-control"
+                          placeholder="Explain why this request is rejected"
+                          required></textarea>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2">
+                <a href="{% url 'workflow:request_detail' req.RequestID %}"
+                   class="btn btn-outline-secondary btn-sm">
+                    Cancel
+                </a>
+
+                <button type="submit"
+                        class="btn btn-outline-danger btn-sm">
+                    Reject Request
+                </button>
+            </div>
+        </form>
+
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/workflow.js' %}"></script>
+{% endblock %}

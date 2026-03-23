@@ -1,0 +1,202 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/accounts.css' %}">
+{% endblock %}
+
+{# ---------------------------------------------------- #}
+{# Page Title (Dynamic: Create or Edit)                #}
+{# ---------------------------------------------------- #}
+{% block title %}
+    {% if mode == "edit" %}Edit User{% else %}Create User{% endif %}
+{% endblock %}
+
+{% block content %}
+
+<div class="container py-4">
+
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h5 mb-1">
+                {% if mode == "edit" %}Edit User{% else %}Create User{% endif %}
+            </h1>
+            <p class="text-muted small mb-0">
+                {% if mode == "edit" %}
+                    Update user details and role membership.
+                {% else %}
+                    Create a new user account.
+                {% endif %}
+            </p>
+        </div>
+
+        <a href="{% url 'accounts:users_list' %}"
+           class="btn btn-outline-secondary btn-sm">
+            Back to Users
+        </a>
+    </div>
+
+    <!-- Form Card -->
+    <div class="bg-white border rounded p-4">
+
+        <!-- Display messages -->
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags|default:'info' }} small">
+                    {{ message }}
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- User Form -->
+        <form method="POST">
+            {% csrf_token %}
+
+            <!-- Username -->
+            <div class="mb-3">
+                <label class="form-label">
+                    Username <span class="text-danger">*</span>
+                </label>
+
+                <input type="text"
+                       name="username"
+                       class="form-control"
+                       value="{% if mode == 'edit' %}{{ user_obj.Username }}{% endif %}"
+                       {% if mode == "edit" %}readonly{% endif %}
+                       required>
+
+                <div class="form-text">
+                    {% if mode == "edit" %}
+                        Username cannot be changed.
+                    {% else %}
+                        Must be unique.
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Password -->
+            {% if mode == "edit" %}
+                <!-- ===================================================== -->
+                <!-- CHANGED: removed Old Password completely              -->
+                <!-- CHANGED: new password is optional on edit            -->
+                <!-- CHANGED: removed red asterisks from edit labels      -->
+                <!-- ===================================================== -->
+
+                <div class="mb-3">
+                    <label class="form-label">
+                        New Password
+                    </label>
+                    <input  type="password"
+                            name="password"
+                            class="form-control"
+                            placeholder="Leave blank if you do not want to change the password">
+                    <div class="form-text">
+                        Leave blank if you do not want to change the password.
+                    </div>
+                </div>
+                
+
+                <div class="mb-4">
+                    <label class="form-label">
+                        Confirm New Password
+                    </label>
+                    <input  type="password"
+                            name="confirm_password"
+                            class="form-control"
+                            placeholder="Re-enter new password">
+                </div>
+            {% else %}
+                <!-- Create user -->
+                <div class="mb-3">
+                    <label class="form-label">
+                        Password <span class="text-danger">*</span>
+                    </label>
+                    <input type="password" name="password" class="form-control" required>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">
+                        Confirm Password <span class="text-danger">*</span>
+                    </label>
+                    <input type="password" name="confirm_password" class="form-control" required>
+                </div>
+            {% endif %}
+
+            <!-- Full Name -->
+            <div class="mb-3">
+                <label class="form-label">Full Name</label>
+                <input type="text"
+                       name="full_name"
+                       class="form-control"
+                       value="{% if mode == 'edit' %}{{ user_obj.FullName }}{% endif %}">
+            </div>
+
+            <!-- Email -->
+            <div class="mb-4">
+                <label class="form-label">Email</label>
+                <input type="email"
+                       name="email"
+                       class="form-control"
+                       value="{% if mode == 'edit' %}{{ user_obj.Email }}{% endif %}">
+            </div>
+
+            <!-- Assign Role -->
+            <div class="mb-4">
+                <label class="form-label fw-medium">
+                    Assign Role
+                </label>
+
+                <div class="row">
+                    {% for group in groups %}
+                        <div class="col-md-4 mb-2">
+                            <div class="border rounded p-2">
+                                <div class="form-check">
+                                    <input class="form-check-input"
+                                           type="radio"
+                                           name="group_id"
+                                           value="{{ group.group_id }}"
+                                           id="group_{{ group.group_id }}"
+                                           {% if mode == "edit" and group.group_id in current_group_ids %}checked{% endif %}
+                                           {% if mode == "create" and group.name|lower == "viewer" %}checked{% endif %}>
+
+                                    <label class="form-check-label ms-2" for="group_{{ group.group_id }}">
+                                        {{ group.name }}
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="col-12">
+                            <div class="alert alert-warning small">
+                                No roles available.
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex justify-content-end gap-2">
+                <a href="{% url 'accounts:users_list' %}"
+                   class="btn btn-outline-secondary btn-sm">
+                    Cancel
+                </a>
+
+                <button type="submit"
+                        class="btn btn-outline-primary btn-sm">
+                    {% if mode == "edit" %}Save Changes{% else %}Create User{% endif %}
+                </button>
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/accounts.js' %}"></script>
+{% endblock %}

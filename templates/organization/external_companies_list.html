@@ -1,0 +1,98 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}External Companies{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h5 mb-1">External Companies</h1>
+            <p class="text-muted small mb-0">
+                Manage external companies captured from registry records.
+            </p>
+        </div>
+    </div>
+
+    <div class="bg-white border rounded p-3 mb-3">
+        <form method="GET" class="d-flex flex-wrap gap-2 align-items-center">
+            <input type="text"
+                   name="q"
+                   value="{{ q }}"
+                   class="form-control form-control-sm"
+                   style="max-width: 320px;"
+                   placeholder="Search company name or description">
+
+            <button type="submit" class="btn btn-outline-primary btn-sm">
+                Search
+            </button>
+
+            <a href="{% url 'organization:external_companies_list' %}"
+                class="btn btn-outline-secondary btn-sm">
+                Reset
+            </a>
+        </form>
+    </div>
+
+    <div class="bg-white border rounded p-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 90px;">ID</th>
+                        <th>Company Name</th>
+                        <th>Description</th>
+                        <th style="width: 180px;">Created At</th>
+                        <th style="width: 180px;">Updated At</th>
+                        <th style="width: 180px;" class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for company in external_companies %}
+                    <tr>
+                        <td>{{ company.ExternalCompanyNameID }}</td>
+                        <td class="fw-medium">{{ company.CompanyName }}</td>
+                        <td>{{ company.Description|default:"—" }}</td>
+                        <td>
+                            {% if company.CreatedAt %}
+                                {{ company.CreatedAt|date:"Y-m-d H:i" }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if company.UpdatedAt %}
+                                {{ company.UpdatedAt|date:"Y-m-d H:i" }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                        <td class="text-end">
+                            <a  href="{% url 'organization:external_company_detail' company.ExternalCompanyNameID %}"
+                                class="btn btn-outline-secondary btn-sm">
+                                View
+                            </a>
+
+                            {% if is_admin %}
+                            <a href="{% url 'organization:external_company_edit' company.ExternalCompanyNameID %}"
+                                class="btn btn-outline-primary btn-sm">
+                                Edit
+                            </a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-4">
+                            No external companies found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

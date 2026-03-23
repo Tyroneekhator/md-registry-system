@@ -1,0 +1,468 @@
+{% extends "base/base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}MD Registry Records{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+  <!-- Page Header -->
+  <div class="mb-3">
+    <h1 class="h5 mb-1 fw-bold">MD Registry Records</h1>
+    <div class="text-muted small">Browse, filter, import and export registry records.</div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="bg-white border p-3 mb-3">
+    <div class="d-flex flex-wrap align-items-center gap-2">
+
+      {% if is_admin or is_clerk %}
+        <a href="{% url 'records:record_create' %}" class="btn btn-primary btn-sm">
+          + Add Record
+        </a>
+      {% endif %}
+
+      <a href="{% url 'records:records_export_excel' %}" class="btn btn-outline-success btn-sm">
+        Export All
+      </a>
+
+      
+      <span
+        id="exportFilteredWrapper"
+        {% if not request.GET %}
+          data-bs-toggle="tooltip"
+          data-bs-placement="top"
+          data-bs-custom-class="tooltip-dark"
+          title="Works only when records are filtered or sorted."
+        {% endif %}
+      >
+        <a id="exportFilteredBtn"
+          data-export-base="{% url 'records:records_export_excel' %}"
+          class="btn btn-outline-success btn-sm {% if not request.GET %}disabled{% endif %}"
+          href="{% if request.GET %}{% url 'records:records_export_excel' %}?{{ request.GET.urlencode }}{% else %}javascript:void(0);{% endif %}">
+          Export Filtered Records
+        </a>
+      </span>
+      {% if is_admin or is_clerk %}
+        <a href="{% url 'records:records_import' %}" class="btn btn-outline-secondary btn-sm">
+          Import Excel
+        </a>
+      {% endif %}
+
+      <div class="ms-auto text-end">
+        <div class="small text-muted">Total records</div>
+        <div class="fw-semibold">
+          <span id="totalRecordsCount">
+            {% if page_obj %}
+              {{ page_obj.paginator.count }}
+            {% else %}
+              {{ total_records|default:"0" }}
+            {% endif %}
+          </span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Filters -->
+  <div class="bg-white border mb-3">
+    <div class="border-bottom px-3 py-2 fw-semibold">Filters</div>
+
+    <div class="p-3">
+      {# CORRECTION: explicit action for AJAX apply/reset #}
+      <form id="recordsFiltersForm" method="get" action="{% url 'records:records_table' %}" class="row g-3">
+
+        <!-- Messenger name -->
+        <div class="col-md-4">
+          <label class="form-label small">
+            Messenger name
+            <span class="ms-1 text-muted rounded-circle border d-inline-flex align-items-center justify-content-center"
+                  style="width:18px; height:18px; font-size:12px; cursor:pointer;"
+                  data-bs-toggle="tooltip"
+                  title="Filter by MessengerName (contains match).">?</span>
+          </label>
+          <input type="text" class="form-control form-control-sm"
+          id="messengerNameInput" name="messenger_name"
+                  value="{{ messenger_name|default:'' }}" placeholder="e.g., John Doe">
+        </div>
+
+        <!-- Subject -->
+        <div class="col-md-4">
+          <label class="form-label small">
+            Subject
+            <span class="ms-1 text-muted rounded-circle border d-inline-flex align-items-center justify-content-center"
+                  style="width:18px; height:18px; font-size:12px; cursor:pointer;"
+                  data-bs-toggle="tooltip"
+                  title="Filter by Subject (contains match).">?</span>
+          </label>
+          <input type="text" class="form-control form-control-sm"
+          id="subjectInput"
+          name="subject"
+                  value="{{ subject|default:'' }}" placeholder="e.g., Payment">
+        </div>
+
+        <!-- Invoice number -->
+        <div class="col-md-4">
+          <label class="form-label small">
+            Invoice number
+            <span class="ms-1 text-muted rounded-circle border d-inline-flex align-items-center justify-content-center"
+                  style="width:18px; height:18px; font-size:12px; cursor:pointer;"
+                  data-bs-toggle="tooltip"
+                  title="Filter by InvoiceNumber (exact match).">?</span>
+          </label>
+          <input type="number" class="form-control form-control-sm" 
+          id="invoiceNumberInput"
+          name="invoice_number"
+                  value="{{ invoice_number|default:'' }}" placeholder="e.g., 1023">
+        </div>
+
+        <!-- Status -->
+        <div class="col-md-3">
+          <label class="form-label small">
+            Status
+            <span class="ms-1 text-muted rounded-circle border d-inline-flex align-items-center justify-content-center"
+                  style="width:18px; height:18px; font-size:12px; cursor:pointer;"
+                  data-bs-toggle="tooltip"
+                  title="Filter records by MD handling status.">?</span>
+          </label>
+          <select name="Status" class="form-select form-select-sm">
+            <option value="">-- All --</option>
+            <option value="With MD" {% if request.GET.Status == "With MD" %}selected{% endif %}>With MD</option>
+            <option value="Not with MD" {% if request.GET.Status == "Not with MD" %}selected{% endif %}>Not with MD</option>
+          </select>
+        </div>
+
+        <!-- Returned -->
+        <div class="col-md-3">
+          <label class="form-label small">
+            Returned
+            <span class="ms-1 text-muted rounded-circle border d-inline-flex align-items-center justify-content-center"
+                  style="width:18px; height:18px; font-size:12px; cursor:pointer;"
+                  data-bs-toggle="tooltip"
+                  title="Filter by Returned field (e.g., Yes/No).">?</span>
+          </label>
+          <select name="returned" class="form-select form-select-sm">
+            <option value="" {% if not returned %}selected{% endif %}>All</option>
+            <option value="Yes" {% if returned == "Yes" %}selected{% endif %}>Yes</option>
+            <option value="No" {% if returned == "No" %}selected{% endif %}>No</option>
+          </select>
+        </div>
+
+        <!-- Pending Request -->
+        <div class="col-md-3">
+          <label class="form-label small">
+            Pending Request
+            <span class="ms-1 text-muted rounded-circle border d-inline-flex align-items-center justify-content-center"
+                  style="width:18px; height:18px; font-size:12px; cursor:pointer;"
+                  data-bs-toggle="tooltip"
+                  title="Filter records by workflow requests that are still pending.">?</span>
+          </label>
+          <select name="pending_request" id="pendingRequestSelect" class="form-select form-select-sm">
+            <option value="" {% if not pending_request %}selected{% endif %}>All</option>
+            <option value="any" {% if pending_request == "any" %}selected{% endif %}>Has Any Pending Request</option>
+            <option value="EDIT" {% if pending_request == "EDIT" %}selected{% endif %}>Pending Edit</option>
+            <option value="DELETE" {% if pending_request == "DELETE" %}selected{% endif %}>Pending Delete</option>
+            <option value="RESTORE" {% if pending_request == "RESTORE" %}selected{% endif %}>Pending Restore</option>
+            <option value="none" {% if pending_request == "none" %}selected{% endif %}>No Pending Request</option>
+          </select>
+        </div>
+
+        <!-- Sort controls -->
+        <div class="col-md-3">
+          <label class="form-label small">
+            Sort by
+            <span class="ms-1 text-muted rounded-circle border d-inline-flex align-items-center justify-content-center"
+                  style="width:18px; height:18px; font-size:12px; cursor:pointer;"
+                  data-bs-toggle="tooltip"
+                  title="Sort records by date received, dispatched, or returned.">?</span>
+          </label>
+          <select id="sortSelect" name="sort" class="form-select form-select-sm">
+            <option value="" {% if not request.GET.sort %}selected{% endif %}>Default</option>
+            <option value="received" {% if request.GET.sort == "received" %}selected{% endif %}>Date Received</option>
+            <option value="dispatched" {% if request.GET.sort == "dispatched" %}selected{% endif %}>Date Dispatched</option>
+            <option value="returned" {% if request.GET.sort == "returned" %}selected{% endif %}>Date Returned</option>
+            <option value="invoice" {% if request.GET.sort == "invoice" %}selected{% endif %}>Invoice Number</option>
+            <option value="messenger" {% if request.GET.sort == "messenger" %}selected{% endif %}>Messenger Name</option>
+            <option value="subject" {% if request.GET.sort == "subject" %}selected{% endif %}>Subject</option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label small">
+            Order by
+            <span class="ms-1 text-muted rounded-circle border d-inline-flex align-items-center justify-content-center"
+                  style="width:18px; height:18px; font-size:12px; cursor:pointer;"
+                  data-bs-toggle="tooltip"
+                  title="Newest first (DESC) or oldest first (ASC).">?</span>
+          </label>
+          <select id="dirSelect" name="dir" class="form-select form-select-sm">
+            <option value="asc" {% if request.GET.dir == "asc" %}selected{% endif %}>Oldest → Newest</option>
+            <option value="desc" {% if request.GET.dir == "desc" or not request.GET.dir %}selected{% endif %}>Newest → Oldest</option>
+          </select>
+        </div>
+
+        <!-- Date received -->
+        <div class="col-md-3">
+          <label class="form-label small">
+            Date received (from)
+            <span class="ms-1 text-muted rounded-circle border d-inline-flex align-items-center justify-content-center"
+                  style="width:18px; height:18px; font-size:12px; cursor:pointer;"
+                  data-bs-toggle="tooltip"
+                  title="Filter DateReceived from this date/time.">?</span>
+          </label>
+          <input type="datetime-local" class="form-control form-control-sm" name="date_received_from"
+                 value="{{ date_received_from|default:'' }}">
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label small">
+            Date received (to)
+            <span class="ms-1 text-muted rounded-circle border d-inline-flex align-items-center justify-content-center"
+                  style="width:18px; height:18px; font-size:12px; cursor:pointer;"
+                  data-bs-toggle="tooltip"
+                  title="Filter DateReceived up to this date/time.">?</span>
+          </label>
+          <input type="datetime-local" class="form-control form-control-sm" name="date_received_to"
+                 value="{{ date_received_to|default:'' }}">
+        </div>
+
+        <!-- Departments -->
+        <div class="col-md-3">
+          <label class="form-label small">
+            External Company Name
+            <span class="ms-1 text-muted rounded-circle border d-inline-flex align-items-center justify-content-center"
+                  style="width:18px; height:18px; font-size:12px; cursor:pointer;"
+                  data-bs-toggle="tooltip"
+                  title="Filter by stored external company names.">?</span>
+          </label>
+          
+          <select class="form-select form-select-sm" name="external_company_name_id">
+            <option value="">All</option>
+            <option value="__has_value__"
+              {% if external_company_name_id == "__has_value__" %}selected{% endif %}>
+                Has External Company Name
+            </option>
+            {% for company in external_company_names %}
+              <option value="{{ company.ExternalCompanyNameID }}"
+                  {% if company.ExternalCompanyNameID|stringformat:"s" == external_company_name_id|stringformat:"s" %}selected{% endif %}>
+                  {{ company.CompanyName }}
+              </option>
+            {% endfor %}
+          </select>
+
+        </div>
+        <div class="col-md-3">
+          <label class="form-label small">
+            Incoming Department Name
+            <span class="ms-1 text-muted rounded-circle border d-inline-flex align-items-center justify-content-center"
+                  style="width:18px; height:18px; font-size:12px; cursor:pointer;"
+                  data-bs-toggle="tooltip"
+                  title="Filter by IncomingDepartmentID (Department).">?</span>
+          </label>
+          <select class="form-select form-select-sm" name="incoming_department_id">
+            <option value="">All</option>
+            {% for dept in departments %}
+              <option value="{{ dept.DepartmentID }}"
+                {% if dept.DepartmentID|stringformat:"s" == incoming_department_id|stringformat:"s" %}selected{% endif %}>
+                {{ dept.DepartmentName }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label small">
+            Outgoing Department Name
+            <span class="ms-1 text-muted rounded-circle border d-inline-flex align-items-center justify-content-center"
+                  style="width:18px; height:18px; font-size:12px; cursor:pointer;"
+                  data-bs-toggle="tooltip"
+                  title="Filter by OutgoingDepartmentID (Department).">?</span>
+          </label>
+          <select class="form-select form-select-sm" name="outgoing_department_id">
+            <option value="">All</option>
+            {% for dept in departments %}
+              <option value="{{ dept.DepartmentID }}"
+                {% if dept.DepartmentID|stringformat:"s" == outgoing_department_id|stringformat:"s" %}selected{% endif %}>
+                {{ dept.DepartmentName }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <!-- Date dispatched -->
+        <div class="col-md-3">
+          <label class="form-label small">
+            Date Dispatched (from)
+            <span class="ms-1 text-muted rounded-circle border d-inline-flex align-items-center justify-content-center"
+                  style="width:18px; height:18px; font-size:12px; cursor:pointer;"
+                  data-bs-toggle="tooltip"
+                  title="Filter DateDispatched from this date/time.">?</span>
+          </label>
+          <input type="datetime-local" class="form-control form-control-sm" name="date_dispatched_from"
+                 value="{{ date_dispatched_from|default:'' }}">
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label small">
+            Date Dispatched (to)
+            <span class="ms-1 text-muted rounded-circle border d-inline-flex align-items-center justify-content-center"
+                  style="width:18px; height:18px; font-size:12px; cursor:pointer;"
+                  data-bs-toggle="tooltip"
+                  title="Filter DateDispatched up to this date/time.">?</span>
+          </label>
+          <input type="datetime-local" class="form-control form-control-sm" name="date_dispatched_to"
+                 value="{{ date_dispatched_to|default:'' }}">
+        </div>
+
+        <!-- Date returned -->
+        <div class="col-md-3">
+          <label class="form-label small">
+            Date returned (from)
+            <span class="ms-1 text-muted rounded-circle border d-inline-flex align-items-center justify-content-center"
+                  style="width:18px; height:18px; font-size:12px; cursor:pointer;"
+                  data-bs-toggle="tooltip"
+                  title="Filter DateReturned from this date.">?</span>
+          </label>
+          <input type="date" class="form-control form-control-sm" name="date_returned_from"
+                 value="{{ date_returned_from|default:'' }}">
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label small">
+            Date returned (to)
+            <span class="ms-1 text-muted rounded-circle border d-inline-flex align-items-center justify-content-center"
+                  style="width:18px; height:18px; font-size:12px; cursor:pointer;"
+                  data-bs-toggle="tooltip"
+                  title="Filter DateReturned up to this date.">?</span>
+          </label>
+          <input type="date" class="form-control form-control-sm" name="date_returned_to"
+                 value="{{ date_returned_to|default:'' }}">
+        </div>
+
+        <div class="col-12 d-flex flex-wrap gap-2 justify-content-end">
+          {# CORRECTION: buttons remain type=button because JS handles AJAX apply/reset #}
+          <button type="button" id="applyFiltersBtn" class="btn btn-outline-secondary btn-sm">
+            Apply Filters
+          </button>
+
+          <button type="button" id="resetFiltersBtn" class="btn btn-outline-secondary btn-sm">
+            Reset
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  {# CORRECTION: single results container only; removed duplicated leftover table/pagination below #}
+  <div id="recordsResultsContainer">
+        
+        
+
+
+
+      <!-- Records table -->
+        <div class="bg-white border p-0">
+          <div class="table-responsive" id="recordsTableContainer" data-url="{% url 'records:records_table' %}">
+            {% if is_admin or is_clerk %}
+            <div class="bg-white border border-bottom-0 px-3 py-2 d-flex flex-wrap align-items-center gap-2">
+              <div class="small text-muted">
+                Selected: <span id="selectedRecordsCount">0</span>
+              </div>
+            <form id="bulkDeleteForm"
+                method="post"
+                action="{% url 'records:records_bulk_delete' %}"
+                class="d-inline">
+            {% csrf_token %}
+            <div id="bulkDeleteHiddenInputs"></div>
+
+            <button type="submit"
+                id="bulkDeleteBtn"
+                class="btn btn-outline-danger btn-sm"
+                disabled>
+            {% if is_admin %}
+              Delete Selected
+            {% else %}
+              Request Delete Selected
+            {% endif %}
+            </button>
+          </form>
+          {% if page_obj %}
+          <div class="ms-auto">
+            <nav>
+              <ul class="pagination pagination-sm mb-0">
+
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                      <a class="page-link"
+                          href="?page={{ page_obj.previous_page_number }}&invoice_number={{ invoice_number|default:''|urlencode }}&messenger_name={{ messenger_name|default:''|urlencode }}&subject={{ subject|default:''|urlencode }}&date_received_from={{ date_received_from|default:''|urlencode }}&date_received_to={{ date_received_to|default:''|urlencode }}&external_company_name_id={{ external_company_name_id|default:''|urlencode }} &incoming_department_id={{ incoming_department_id|default:''|urlencode }}&outgoing_department_id={{ outgoing_department_id|default:''|urlencode }}&date_dispatched_from={{ date_dispatched_from|default:''|urlencode }}&date_dispatched_to={{ date_dispatched_to|default:''|urlencode }}&returned={{ returned|default:''|urlencode }}&pending_request={{ pending_request|default:''|urlencode }}&date_returned_from={{ date_returned_from|default:''|urlencode }}&date_returned_to={{ date_returned_to|default:''|urlencode }}&Status={{ request.GET.Status|default:''|urlencode }}&sort={{ request.GET.sort|default:''|urlencode }}&dir={{ request.GET.dir|default:''|urlencode }}">
+                        Previous
+                      </a>
+                    </li>
+                  {% endif %}
+
+                  <li class="page-item active">
+                    <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+                  </li>
+
+                  {% if page_obj.has_next %}
+                    <li class="page-item">
+                      <a class="page-link"
+                          href="?page={{ page_obj.next_page_number }}&invoice_number={{ invoice_number|default:''|urlencode }}&messenger_name={{ messenger_name|default:''|urlencode }}&subject={{ subject|default:''|urlencode }}&date_received_from={{ date_received_from|default:''|urlencode }}&date_received_to={{ date_received_to|default:''|urlencode }}&external_company_name_id={{ external_company_name_id|default:''|urlencode }} &incoming_department_id={{ incoming_department_id|default:''|urlencode }}&outgoing_department_id={{ outgoing_department_id|default:''|urlencode }}&date_dispatched_from={{ date_dispatched_from|default:''|urlencode }}&date_dispatched_to={{ date_dispatched_to|default:''|urlencode }}&returned={{ returned|default:''|urlencode }}&pending_request={{ pending_request|default:''|urlencode }}&date_returned_from={{ date_returned_from|default:''|urlencode }}&date_returned_to={{ date_returned_to|default:''|urlencode }}&Status={{ request.GET.Status|default:''|urlencode }}&sort={{ request.GET.sort|default:''|urlencode }}&dir={{ request.GET.dir|default:''|urlencode }}">
+                        Next
+                      </a>
+                    </li>
+                  {% endif %}
+
+                </ul>
+              </nav>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              {% if is_admin or is_clerk %}
+              <th style="width: 42px;">
+                <input type="checkbox"
+                    id="selectAllRecords"
+                    class="form-check-input"
+                    aria-label="Select all records">
+              </th>
+              {% endif %}
+              <th>Invoice</th>
+              <th>Messenger</th>
+              <th>Subject</th>
+              <th>External Company Name</th>
+              <th>Incoming Dept</th>
+              <th>Outgoing Dept</th>
+              <th>Date Received</th>
+              <th>Date Dispatched</th>
+              <th>Returned</th>
+              <th>Date Returned</th>
+              <th>Status</th>
+              <th class="text-end">Actions</th>
+            </tr>
+          </thead>
+
+          <tbody id="recordsTbody">
+
+            {% include "records/_records_rows.html" %}
+            
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/records.js' %}"></script>
+{% endblock %}

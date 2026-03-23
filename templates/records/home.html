@@ -1,0 +1,123 @@
+{% extends "base/base.html" %}
+
+{# ---------------------------------------------------- #}
+{# Page Title                                           #}
+{# ---------------------------------------------------- #}
+{% block title %}Home{% endblock %}
+
+{% block content %}
+
+<div class="container py-4">
+
+    <!-- ================================================= -->
+    <!-- Welcome Section                                   -->
+    <!-- ================================================= -->
+    <div class="mb-4">
+        <h1 class="h5 mb-1">Welcome to MD Registry</h1>
+        <p class="text-muted small mb-0">
+            Use the quick links below to navigate through the system.
+        </p>
+    </div>
+
+    <!-- ================================================= -->
+    <!-- Quick Access Cards                                -->
+    <!-- ================================================= -->
+    <div class="row g-3">
+
+        <!-- Dashboard -->
+        <div class="col-md-4">
+            <div class="bg-white border rounded p-4 h-100">
+
+                <h2 class="h6">Dashboard</h2>
+                <p class="text-muted small">
+                    View record statistics and recent activity.
+                </p>
+
+                <a href="{% url 'records:dashboard' %}"
+                   class="btn btn-outline-primary btn-sm">
+                    Go to Dashboard
+                </a>
+
+            </div>
+        </div>
+
+        <!-- Records -->
+        <div class="col-md-4">
+            <div class="bg-white border rounded p-4 h-100">
+
+                <h2 class="h6">Records</h2>
+                <p class="text-muted small">
+                    Browse, search, and manage registry records.
+                </p>
+
+                <a href="{% url 'records:records_table' %}"
+                   class="btn btn-outline-primary btn-sm">
+                    View Records
+                </a>
+
+            </div>
+        </div>
+
+        <!-- Create Record (Clerk/Admin only) -->
+        {% if is_admin or is_clerk %}
+        <div class="col-md-4">
+            <div class="bg-white border rounded p-4 h-100">
+
+                <h2 class="h6">Create Record</h2>
+                <p class="text-muted small">
+                    Add a new record to the registry.
+                </p>
+
+                <a href="{% url 'records:record_create' %}"
+                   class="btn btn-outline-primary btn-sm">
+                    Create Record
+                </a>
+
+            </div>
+        </div>
+        {% endif %}
+
+
+        {% if is_admin or is_clerk %}
+        <!-- Requests -->
+        <div class="col-md-4">
+            <div class="bg-white border rounded p-4 h-100">
+
+                <h2 class="h6">Requests</h2>
+                <p class="text-muted small">
+                    Submit or review action requests.
+                </p>
+
+                <a href="{% url 'workflow:requests_list' %}"
+                   class="btn btn-outline-primary btn-sm">
+                    View Requests
+                </a>
+
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Excel Import (Clerk/Admin only) -->
+        {% if is_admin or is_clerk %}
+        <div class="col-md-4">
+            <div class="bg-white border rounded p-4 h-100">
+
+                <h2 class="h6">Import Records</h2>
+                <p class="text-muted small">
+                    Upload Excel file to import multiple records.
+                </p>
+
+                <a href="{% url 'records:records_import' %}"
+                   class="btn btn-outline-secondary btn-sm">
+                    Import Excel
+                </a>
+
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+
+</div>
+
+{% endblock %}

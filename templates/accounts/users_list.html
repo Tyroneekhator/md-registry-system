@@ -1,0 +1,193 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{# ---------------------------------------------------- #}
+{# Page Title                                           #}
+{# ---------------------------------------------------- #}
+{% block title %}Users{% endblock %}
+
+{% block content %}
+
+<div class="container py-4">
+
+    <!-- Page Header -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h5 mb-1">User Management</h1>
+            <p class="text-muted small mb-0">
+                View and manage system user accounts.
+            </p>
+        </div>
+
+        <!-- Create User Button -->
+        {% if is_admin %}
+        <a href="{% url 'accounts:user_create' %}" class="btn btn-outline-primary btn-sm">
+            + Create User
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- Search / Filter Bar -->
+    <form method="GET" class="d-flex flex-wrap gap-2 align-items-center mb-3">
+
+        <!-- Search input -->
+        <input type="text"
+               name="q"
+               value="{{ q }}"
+               class="form-control form-control-sm"
+               style="max-width: 320px;"
+               placeholder="Search username, name, email">
+
+        <!-- Search button -->
+        <button type="submit" class="btn btn-outline-secondary btn-sm">
+            Search
+        </button>
+
+        <!-- Reset button -->
+        <a href="{% url 'accounts:users_list' %}" class="btn btn-outline-secondary btn-sm">
+            Reset
+        </a>
+
+    </form>
+
+    <!-- Messages -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} small">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- Users Table Card -->
+    <div class="bg-white border rounded p-0">
+
+        <div class="table-responsive">
+            <table class="table align-middle mb-0">
+
+                <!-- Table Header -->
+                <thead class="table-light">
+                    <tr>
+                        <th>Username</th>
+                        <th>Full Name</th>
+                        <th>Email</th>
+                        <th>Roles</th>
+                        <th>Status</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                    {# users_with_groups = [{ user: User, groups: [Group...] }, ...] #}
+                    {% for item in users_with_groups %}
+                        {% with user=item.user groups=item.groups %}
+
+                        <tr>
+                            <!-- Username -->
+                            <td class="fw-medium">{{ user.username }}</td>
+
+                            <!-- Full Name -->
+                            <td>
+                                {% if user.full_name %}
+                                    {{ user.full_name }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+
+                            <!-- Email -->
+                            <td>
+                                {% if user.email %}
+                                    {{ user.email }}
+                                {% else %}
+                                    —
+                                {% endif %}
+                            </td>
+
+                            <!-- Roles -->
+                            <td>
+                                {% for group in groups %}
+
+                                    {% if group.name|lower == "admin" %}
+                                        <span class="badge text-bg-danger me-1">Admin</span>
+                                    {% elif group.name|lower == "clerk" %}
+                                        <span class="badge text-bg-primary me-1">Clerk</span>
+                                    {% elif group.name|lower == "viewer" %}
+                                        <span class="badge text-bg-secondary me-1">Viewer</span>
+                                    {% else %}
+                                        <span class="badge text-bg-dark me-1">{{ group.name }}</span>
+                                    {% endif %}
+
+                                {% empty %}
+                                    <span class="text-muted small">No roles</span>
+                                {% endfor %}
+                            </td>
+
+                            <!-- Active/Disabled -->
+                            <td>
+                                {% if user.is_active %}
+                                    <span class="badge text-bg-success">Active</span>
+                                {% else %}
+                                    <span class="badge text-bg-danger">Disabled</span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Actions -->
+                            <td class="text-end">
+                                <a href="{% url 'accounts:user_detail' user.UserID %}"
+                                        class="btn btn-outline-secondary btn-sm">
+                                        View
+                                </a>
+
+                                <!-- Edit -->
+                                {% if is_admin %}
+                                    <a href="{% url 'accounts:user_edit' user.UserID %}"
+                                    class="btn btn-outline-primary btn-sm">
+                                        Edit
+                                    </a>
+
+                                    <!-- Enable/Disable toggle -->
+                                    <form method="post"
+                                        action="{% url 'accounts:user_disable' user.UserID %}"
+                                        class="d-inline">
+                                        {% csrf_token %}
+                                        {% if user.is_active %}
+                                            <button type="submit" class="btn btn-outline-danger btn-sm">
+                                                Disable
+                                            </button>
+                                        {% else %}
+                                            <button type="submit" class="btn btn-outline-success btn-sm">
+                                                Enable
+                                            </button>
+                                        {% endif %}
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+
+                        {% endwith %}
+                    {% empty %}
+
+                        <!-- If no users -->
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">
+                                No users found.
+                            </td>
+                        </tr>
+
+                    {% endfor %}
+
+                </tbody>
+            </table>
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/accounts.js' %}"></script>
+{% endblock %}
