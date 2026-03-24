@@ -28,4 +28,9 @@ urlpatterns = [
     path("audit/logs/<int:log_id>/", views.audit_log_detail_view, name="audit_log_detail"),
     # CORRECTION: clerk permanent-delete request route
     path("deleted-records/<int:record_id>/request-permanent-delete/",views.record_permanent_delete_request_view,name="record_permanent_delete_request"),
+    path(
+    "records/<int:record_id>/requests/",
+    views.record_requests_compare_view,
+    name="record_requests_compare",
+    ),
 ]

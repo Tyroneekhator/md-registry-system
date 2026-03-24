@@ -1,2 +1,4 @@
-reportlab
+Django>=5.2
 pillow
+reportlab
+openpyxl

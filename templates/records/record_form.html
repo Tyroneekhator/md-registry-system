@@ -331,9 +331,26 @@
           <div class="bg-white border p-3">
             <div class="d-flex justify-content-end gap-2">
               <a href="{% url 'records:records_table' %}" class="btn btn-outline-secondary btn-sm">Cancel</a>
+
               <button type="submit" class="btn btn-primary btn-sm">
-                {% if mode == "edit" %}Save Changes{% else %}Create Record{% endif %}
+                {% if mode == "edit" %}
+                
+                    {% if is_clerk %}
+                      Send Edit Request
+                    {% else %}
+                      Save Changes
+                    {% endif %}
+
+                {% else %}
+                  Create Record
+                {% endif %}
+
+
+
+
+
               </button>
+
             </div>
           </div>
         </div>

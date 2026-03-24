@@ -1,0 +1,194 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Compare Record Requests{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <!-- ================================================= -->
+    <!-- Page Header -->
+    <!-- ================================================= -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h1 class="h5 mb-1">Conflicting Requests for Record</h1>
+            <p class="text-muted small mb-0">
+                Review all pending requests for this record and decide which one to approve.
+            </p>
+        </div>
+
+        <a href="{% url 'workflow:requests_list' %}"
+           class="btn btn-outline-secondary btn-sm">
+            Back to Requests
+        </a>
+    </div>
+
+    <!-- ================================================= -->
+    <!-- Current Record Summary -->
+    <!-- ================================================= -->
+    
+    <div class="bg-white border rounded p-3 mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h2 class="h6 mb-0">Current Record</h2>
+
+            <a href="{% url 'records:record_detail' record.RecordID %}?from=requests"
+            class="btn btn-outline-secondary btn-sm">
+                Open Record Detail
+            </a>
+        </div>
+
+        <div class="row g-3">
+
+            <div class="col-md-4">
+                <div class="border rounded p-3 h-100 bg-light">
+                    <div class="text-muted small mb-1">Record ID</div>
+                    <div class="fw-semibold">{{ record.RecordID }}</div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="border rounded p-3 h-100 bg-light">
+                    <div class="text-muted small mb-1">Invoice Number</div>
+                    <div class="fw-semibold">{{ record.InvoiceNumber|default:"-" }}</div>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="border rounded p-3 h-100 bg-light">
+                    <div class="text-muted small mb-1">Messenger Name</div>
+                    <div class="fw-semibold">{{ record.MessengerName|default:"-" }}</div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="border rounded p-3 h-100 bg-light">
+                    <div class="text-muted small mb-1">Subject</div>
+                    <div class="fw-semibold">{{ record.Subject|default:"-" }}</div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="border rounded p-3 h-100 bg-light">
+                    <div class="text-muted small mb-1">Status</div>
+                    <div class="fw-semibold">{{ record.Status|default:"-" }}</div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="border rounded p-3 h-100 bg-light">
+                    <div class="text-muted small mb-1">Returned</div>
+                    <div class="fw-semibold">{{ record.Returned|default:"-" }}</div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="border rounded p-3 h-100 bg-light">
+                    <div class="text-muted small mb-1">Date Received</div>
+                    <div class="fw-semibold">{{ record.DateReceived|date:"Y-m-d H:i"|default:"-" }}</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+    <!-- ================================================= -->
+    <!-- Pending Requests -->
+    <!-- ================================================= -->
+    <div class="mb-2">
+        <h2 class="h6 mb-0">Pending Requests</h2>
+    </div>
+
+    {% for item in request_cards %}
+        {% with req=item.req changes=item.changes %}
+        <div class="bg-white border rounded p-3 mb-3">
+
+            <div class="d-flex justify-content-between align-items-start mb-3">
+                <div>
+                    <div class="fw-semibold">
+                        Request #{{ req.RequestID }} — {{ req.RequestType }}
+                    </div>
+                    <div class="text-muted small">
+                        Requested by {{ req.RequestedByUserID }} on {{ req.CreatedAt|date:"Y-m-d H:i" }}
+                    </div>
+                </div>
+
+                <span class="badge bg-warning text-dark">
+                    {{ req.Status|title }}
+                </span>
+            </div>
+
+            <!-- Reason / Details -->
+            <div class="mb-3">
+                <div class="small fw-semibold mb-1">Reason / Comment</div>
+                <div class="border rounded p-2 bg-light small">
+                    {{ req.RequestDetails|linebreaksbr }}
+                </div>
+            </div>
+
+            <!-- Parsed Changes -->
+            <div class="mb-3">
+                <div class="small fw-semibold mb-2">Requested Changes</div>
+
+                {% if changes %}
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Field</th>
+                                    <th>Current / Old Value</th>
+                                    <th>Requested / New Value</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for change in changes %}
+                                    <tr>
+                                        <td>{{ change.field }}</td>
+                                        <td class="text-danger">{{ change.old|default:"-" }}</td>
+                                        <td class="text-success">{{ change.new|default:"-" }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-muted small">
+                        No field-level changes were parsed for this request.
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Actions -->
+            <div class="d-flex justify-content-end gap-2">
+                <a href="{% url 'workflow:request_detail' req.RequestID %}"
+                   class="btn btn-outline-primary btn-sm">
+                    View Details
+                </a>
+
+                <form method="post"
+                      action="{% url 'workflow:request_approve' req.RequestID %}"
+                      class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-success btn-sm">
+                        Approve
+                    </button>
+                </form>
+
+                <a href="{% url 'workflow:request_reject' req.RequestID %}"
+                   class="btn btn-outline-danger btn-sm">
+                    Reject
+                </a>
+            </div>
+
+        </div>
+        {% endwith %}
+    {% empty %}
+        <div class="bg-white border rounded p-4 text-center text-muted">
+            No pending requests found for this record.
+        </div>
+    {% endfor %}
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/workflow.js' %}"></script>
+{% endblock %}

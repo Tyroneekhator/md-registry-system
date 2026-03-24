@@ -1,13 +1,13 @@
 from functools import wraps
 
 from django.contrib import messages
-from django.db.models import Q
+from django.db.models import Q, Count
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_date, parse_datetime
 from django.http import HttpResponseForbidden
-from django.db.models import Q
 from apps.accounts.models import Users
+
 
 from apps.records.models import Records, RecordAttachments
 from apps.workflow.models import ActionRequests, AuditLogs
@@ -288,22 +288,21 @@ def _get_pending_restore_request_for_record(record):
 @login_required_view
 def requests_list_view(request):
     user = request.current_user
-    
+
     if not (_is_admin(user) or _is_clerk(user)):
         messages.error(request, "You do not have permission to access Requests.")
         return redirect("records:dashboard")
 
     status = request.GET.get("status", "")
     q = (request.GET.get("q") or "").strip()
-    
-    # =========================================================
-    # NEW: admin-only clerk filter
-    # =========================================================
-    clerk_id = (request.GET.get("clerk_id") or "").strip()
-    
 
     # =========================================================
-    # 🔒 FORCE SCOPE BY ROLE (IGNORE URL PARAM)
+    # CHANGED: admin-only clerk filter
+    # =========================================================
+    clerk_id = (request.GET.get("clerk_id") or "").strip()
+
+    # =========================================================
+    # CHANGED: force scope by role (ignore URL param)
     # =========================================================
     if _is_admin(user):
         scope = "all"
@@ -311,39 +310,29 @@ def requests_list_view(request):
 
         if clerk_id:
             qs = qs.filter(RequestedByUserID_id=clerk_id)
-            
+
         clerks = Users.objects.filter(
             usergroups__GroupID__GroupName__iexact="Clerk",
             IsActive=True,
         ).distinct().order_by("Username")
-        
+
     elif _is_clerk(user):
         scope = "mine"
         qs = ActionRequests.objects.filter(RequestedByUserID=user)
         clerks = []
-        
         clerk_id = ""
 
     else:
-        scope=""
+        scope = ""
         qs = ActionRequests.objects.none()
         clerks = []
         clerk_id = ""
 
-    # =========================================================
-    # ORDERING
-    # =========================================================
     qs = qs.order_by("-RequestID")
 
-    # =========================================================
-    # STATUS FILTER
-    # =========================================================
     if status:
         qs = qs.filter(Status__iexact=status)
 
-    # =========================================================
-    # SEARCH
-    # =========================================================
     if q:
         filters = (
             Q(RequestType__icontains=q) |
@@ -357,13 +346,37 @@ def requests_list_view(request):
 
         qs = qs.filter(filters)
 
+    # =========================================================
+    # CHANGED: count pending requests per record so the list can
+    # show conflicts and still handle single-request approval/reject
+    # =========================================================
+    pending_counts = (
+        ActionRequests.objects
+        .filter(Status__iexact="pending", TargetRecordID__isnull=False)
+        .values("TargetRecordID")
+        .annotate(total=Count("RequestID"))
+    )
+
+    pending_counts_map = {
+        row["TargetRecordID"]: row["total"]
+        for row in pending_counts
+    }
+
+    requests_list = list(
+        qs.select_related("TargetRecordID", "RequestedByUserID")
+    )
+
+    for req in requests_list:
+        record_id = getattr(req, "TargetRecordID_id", None)
+        req.pending_for_same_record = pending_counts_map.get(record_id, 0)
+
     return render(request, "workflow/requests_list.html", {
-        "requests": qs,
+        "requests": requests_list,  # CHANGED
         "scope": scope,
         "status": status,
         "q": q,
-        "clerks":clerks,
-        "clerk_id":clerk_id,
+        "clerks": clerks,
+        "clerk_id": clerk_id,
         "is_admin": _is_admin(user),
         "is_clerk": _is_clerk(user),
     })
@@ -437,6 +450,35 @@ def request_detail_view(request, request_id):
 
 
 # ============================================================
+# CHANGED: admin compare page for all pending requests on one record
+# ============================================================
+@login_required_view
+@admin_required_view
+def record_requests_compare_view(request, record_id):
+    user = request.current_user
+    record = get_object_or_404(Records, RecordID=record_id)
+
+    pending_requests = ActionRequests.objects.filter(
+        TargetRecordID=record,
+        Status__iexact="pending",
+    ).select_related("RequestedByUserID", "TargetRecordID").order_by("-CreatedAt", "-RequestID")
+
+    request_cards = []
+    for req in pending_requests:
+        request_cards.append({
+            "req": req,
+            "changes": _parse_request_changes(req.RequestDetails or ""),
+        })
+
+    return render(request, "workflow/record_requests_compare.html", {
+        "record": record,
+        "request_cards": request_cards,
+        "is_admin": _is_admin(user),
+        "is_clerk": _is_clerk(user),
+    })
+
+
+# ============================================================
 # 4) request_approve_view
 # ============================================================
 @admin_required_view
@@ -450,6 +492,20 @@ def request_approve_view(request, request_id):
 
     rec = req.TargetRecordID
     action = (req.RequestType or "").upper()
+    
+    if rec is not None:
+        conflicting_pending_count = ActionRequests.objects.filter(
+            TargetRecordID=rec,
+            Status__iexact="pending"
+        ).count()
+
+    if conflicting_pending_count > 1:
+        messages.warning(
+            request,
+            "This record has multiple pending requests. Please review conflicts before approving."
+        )
+        return redirect("workflow:record_requests_compare", record_id=rec.RecordID)
+
 
     if action == "DELETE":
         _mark_record_deleted(rec, user=user)
@@ -470,12 +526,11 @@ def request_approve_view(request, request_id):
             target_record=rec,
             target_request=req,
         )
-        
+
     elif action == "PERMANENT_DELETE":
         if rec and _is_record_deleted(rec):
             rec_id = rec.RecordID
             _permanently_delete_record(rec)
-            
             req.TargetRecordID = None
 
             _audit(
@@ -562,6 +617,42 @@ def request_approve_view(request, request_id):
             target_record=rec,
             target_request=req,
         )
+
+    # =========================================================
+    # CHANGED: for any approved request, supersede the other
+    # pending requests for the same record. Single-request flow
+    # still works because this queryset is empty in that case.
+    # =========================================================
+    if rec is not None:
+        other_pending = ActionRequests.objects.filter(
+            TargetRecordID=rec,
+            Status__iexact="pending",
+        ).exclude(RequestID=req.RequestID)
+
+        for other in other_pending:
+            other.Status = "superseded"
+            other.ReviewedByUserID = user
+            other.ReviewedAt = timezone.now()
+
+            if other.RequestDetails:
+                other.RequestDetails = (
+                    f"{other.RequestDetails}"
+                    f"[SYSTEM]: Superseded because RequestID={req.RequestID} was approved for the same record."
+                )
+            else:
+                other.RequestDetails = (
+                    f"[SYSTEM]: Superseded because RequestID={req.RequestID} was approved for the same record."
+                )
+
+            other.save()
+
+            _audit(
+                request,
+                "REQUEST_SUPERSEDED",
+                f"Superseded RequestID={other.RequestID} because RequestID={req.RequestID} was approved for RecordID={rec.RecordID}",
+                target_record=rec,
+                target_request=other,
+            )
 
     req.Status = "approved"
     req.ReviewedByUserID = user

@@ -1,8 +1,54 @@
-venv/
+# =========================
+# Python / Django
+# =========================
 __pycache__/
-*.pyc
+*.py[cod]
+*.sqlite3
 db.sqlite3
-media/
+
+# =========================
+# Virtual Environment
+# =========================
+venv/
+env/
+ENV/
+
+# =========================
+# Environment variables
+# =========================
 .env
+
+# =========================
+# Static & Media (optional)
+# =========================
+media/
+staticfiles/
+
+# =========================
+# Logs
+# =========================
+*.log
+
+# =========================
+# OS files
+# =========================
 .DS_Store
+Thumbs.db
+
+# =========================
+# IDE / Editor
+# =========================
+.vscode/
+.idea/
+
+# =========================
+# Node (if used later)
+# =========================
 node_modules/
+
+# =========================
+# Migrations (OPTIONAL)
+# Keep if you want DB history
+# =========================
+# */migrations/
+# !*/migrations/__init__.py

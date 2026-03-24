@@ -29,7 +29,11 @@
 
       <!-- Back -->
       {# CORRECTION: if record is deleted, go back to Deleted Records #}
-      {% if record.IsDeleted %}
+      {% if request.GET.from == "requests" %}
+        <a href="{% url 'workflow:requests_list' %}" class="btn btn-outline-secondary btn-sm">
+          Back
+        </a>
+      {% elif record.IsDeleted %}
         <a href="{% url 'workflow:deleted_records_list' %}" class="btn btn-outline-secondary btn-sm">
           Back
         </a>

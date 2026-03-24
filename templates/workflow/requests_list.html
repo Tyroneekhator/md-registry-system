@@ -14,17 +14,10 @@
                 Track and manage approval requests (delete/restore/changes).
             </p>
         </div>
-
-        {% if is_clerk %}
-            <a href="{% url 'workflow:request_create' %}"
-               class="btn btn-outline-primary btn-sm">
-                + New Request
-            </a>
-        {% endif %}
     </div>
 
     <!-- ===================================================== -->
-    <!-- FIXED: role-based scope display only                  -->
+    <!-- Role-based scope display only                         -->
     <!-- ===================================================== -->
     <div class="mb-2">
         <h6 class="mb-0">
@@ -46,11 +39,13 @@
                     <option value="pending" {% if status == "pending" %}selected{% endif %}>Pending</option>
                     <option value="approved" {% if status == "approved" %}selected{% endif %}>Approved</option>
                     <option value="rejected" {% if status == "rejected" %}selected{% endif %}>Rejected</option>
+                    <!-- ✅ CHANGED: include superseded so admin can filter resolved conflicts too -->
+                    <option value="superseded" {% if status == "superseded" %}selected{% endif %}>Superseded</option>
                 </select>
             </div>
 
             <!-- ===================================================== -->
-            <!-- FIXED: removed editable scope dropdown                -->
+            <!-- Scope display only                                    -->
             <!-- ===================================================== -->
             <div class="col-md-3">
                 <label class="form-label small">Scope</label>
@@ -70,7 +65,7 @@
             </div>
 
             <!-- ===================================================== -->
-            <!-- NEW: admin-only clerk filter                          -->
+            <!-- Admin-only clerk filter                               -->
             <!-- ===================================================== -->
             {% if is_admin %}
                 <div class="col-md-3">
@@ -131,65 +126,105 @@
                     {% for req in requests %}
                         <tr>
 
-                            <td class="text-muted">#{{ req.RequestID }}</td>
+                            <td>{{ req.RequestID }}</td>
 
-                            <td class="fw-medium">
-                                {{ req.RequestType|default:"—" }}
+                            <!-- ===================================================== -->
+                            <!-- ✅ CHANGED: Type column should show RequestType        -->
+                            <!-- ===================================================== -->
+                            <td>
+                                {{ req.RequestType|default:"-" }}
                             </td>
 
-                            <td>
+                            <!-- ===================================================== -->
+                            <!-- ✅ CHANGED: Record column should show record link      -->
+                            <!-- Single request: still works normally                  -->
+                            <!-- Multiple requests: shows conflict + compare link      -->
+                            <!-- ===================================================== -->
+
+                           <td>
                                 {% if req.TargetRecordID %}
-                                    <a href="{% url 'records:record_detail' req.TargetRecordID.RecordID %}"
-                                       class="text-decoration-none">
-                                        {{ req.TargetRecordID.title|default:"Record" }}
-                                    </a>
+
+                                    {% if req.pending_for_same_record > 1 %}
+                                        <!-- CONFLICT: go to compare page -->
+                                        <a href="{% url 'workflow:record_requests_compare' req.TargetRecordID.RecordID %}"
+                                        class="text-decoration-none">
+                                            <span class="badge bg-danger me-1">Conflict</span>
+                                            {{ req.TargetRecordID }}
+                                        </a>
+
+                                        <div class="small text-danger">
+                                            {{ req.pending_for_same_record }} pending requests
+                                        </div>
+                                    {% else %}
+                                        <!-- NO CONFLICT: go to record detail like before -->
+                                        <a href="{% url 'records:record_detail' req.TargetRecordID.RecordID %}?from=requests"
+                                        class="text-decoration-none">
+                                            {{ req.TargetRecordID }}
+                                        </a>
+                                    {% endif %}
+
                                 {% else %}
-                                    —
+                                    -
                                 {% endif %}
                             </td>
 
-                            <td>
-                                {{ req.RequestedByUserID.Username|default:"—" }}
-                            </td>
+
+
+
+                            <td>{{ req.RequestedByUserID }}</td>
 
                             <td>
-                                {% if req.Status|lower == "pending" %}
-                                    <span class="badge text-bg-warning">Pending</span>
-                                {% elif req.Status|lower == "approved" %}
-                                    <span class="badge text-bg-success">Approved</span>
+                                {% if req.Status|lower == "approved" %}
+                                    <span class="badge bg-success">Approved</span>
                                 {% elif req.Status|lower == "rejected" %}
-                                    <span class="badge text-bg-danger">Rejected</span>
+                                    <span class="badge bg-danger">Rejected</span>
+                                {% elif req.Status|lower == "superseded" %}
+                                    <span class="badge bg-secondary">Superseded</span>
                                 {% else %}
-                                    <span class="badge text-bg-secondary">{{ req.Status|default:"Unknown" }}</span>
+                                    <span class="badge bg-warning text-dark">Pending</span>
                                 {% endif %}
                             </td>
 
-                            <td>
-                                {{ req.CreatedAt|date:"Y-m-d" }}
-                            </td>
+                            <td>{{ req.CreatedAt }}</td>
 
                             <td class="text-end">
 
-                                <a href="{% url 'workflow:request_detail' req.RequestID %}"
-                                   class="btn btn-outline-secondary btn-sm">
-                                    View
-                                </a>
-
-                                {% if is_admin and req.Status|lower == "pending" %}
-                                    <form method="post"
-                                          action="{% url 'workflow:request_approve' req.RequestID %}"
-                                          class="d-inline">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-outline-success btn-sm">
-                                            Approve
-                                        </button>
-                                    </form>
-
-                                    <a href="{% url 'workflow:request_reject' req.RequestID %}"
-                                       class="btn btn-outline-danger btn-sm">
-                                        Reject
+                                                            
+                                {% if req.pending_for_same_record > 1 %}
+                                    <a href="{% url 'workflow:record_requests_compare' req.TargetRecordID.RecordID %}"
+                                    class="btn btn-outline-warning btn-sm">
+                                        Review Conflicts
+                                    </a>
+                                {% else %}
+                                    <a href="{% url 'workflow:request_detail' req.RequestID %}"
+                                    class="btn btn-outline-primary btn-sm">
+                                        View
                                     </a>
                                 {% endif %}
+
+                                {% if is_admin and req.Status|lower == "pending" %}
+
+                                    {% if req.pending_for_same_record > 1 %}
+                                        {# No approve/reject here for conflicts #}
+                                    {% else %}
+                                        <form method="post"
+                                            action="{% url 'workflow:request_approve' req.RequestID %}"
+                                            class="d-inline">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-outline-success btn-sm">
+                                                Approve
+                                            </button>
+                                        </form>
+
+                                        <a href="{% url 'workflow:request_reject' req.RequestID %}"
+                                        class="btn btn-outline-danger btn-sm">
+                                            Reject
+                                        </a>
+                                    {% endif %}
+
+                                {% endif %}
+
+
 
                             </td>
 
