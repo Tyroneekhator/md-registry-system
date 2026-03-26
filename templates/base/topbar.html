@@ -11,16 +11,16 @@
 
   <div class="corp-topbar-right d-flex align-items-center gap-2">
     {% if is_admin %}
-      <span class="badge corp-role-badge bg-corp-admin">Admin</span>
+      <span class="badge corp-role-badge bg-corp-admin">{{ request.current_user.Username }}  (Admin)</span>
 
     {% elif is_clerk %}
-      <span class="badge corp-role-badge bg-corp-clerk">Clerk</span>
+      <span class="badge corp-role-badge bg-corp-clerk"> {{ request.current_user.Username }} (Clerk)</span>
 
     {% elif is_viewer %}
-      <span class="badge corp-role-badge bg-corp-viewer">Viewer</span>
+      <span class="badge corp-role-badge bg-corp-viewer">{{ request.current_user.Username }} (Viewer)</span>
 
     {% else %}
-      <span class="badge corp-role-badge bg-secondary">User</span>
+      <span class="badge corp-role-badge bg-secondary">{{ request.current_user.Username }} (User)</span>
     {% endif %}
 
     <div class="dropdown">

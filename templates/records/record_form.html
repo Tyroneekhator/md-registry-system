@@ -101,7 +101,7 @@
                   <input type="text"
                          name="external_company_name"
                          class="form-control form-control-sm"
-                         value="{% if data.external_company_name %}{{ data.external_company_name }}{% elif record and record.ExternalCompanyName %}{{ record.ExternalCompanyName.CompanyName|default:'' }}{% endif %}"
+                         value="{% if data.external_company_name %}{{ data.external_company_name }}{% elif external_company_name_value %}{{ external_company_name_value }}{% elif record and record.ExternalCompanyName %}{{ record.ExternalCompanyName.CompanyName|default:'' }}{% endif %}"
                          placeholder="Type company name">
                 </div>
 
@@ -140,7 +140,7 @@
                          name="incoming_department_new"
                          id="incomingDepartmentNewInput"
                          class="form-control mt-2"
-                         value="{{ data.incoming_department_new|default:'' }}"
+                         value="{% if data.incoming_department_new %}{{ data.incoming_department_new }}{% elif incoming_department_new_value %}{{ incoming_department_new_value }}{% endif %}"
                          placeholder="Or type new department name">
                 </div>
 
@@ -167,7 +167,7 @@
                          name="outgoing_department_new"
                          id="outgoingDepartmentNewInput"
                          class="form-control mt-2"
-                         value="{{ data.outgoing_department_new|default:'' }}"
+                         value="{% if data.outgoing_department_new %}{{ data.outgoing_department_new }}{% elif outgoing_department_new_value %}{{ outgoing_department_new_value }}{% endif %}"
                          placeholder="Or type new department name">
                 </div>
 
@@ -306,10 +306,15 @@
                               Download
                             </a>
                             {% if is_admin or is_clerk %}
-                              <a href="{% url 'records:attachment_delete' attachment.AttachmentID %}"
-                                 class="btn btn-outline-danger btn-sm">
-                                Remove
-                              </a>
+                                <form method="post"
+                                      action="{% url 'records:attachment_delete' attachment.AttachmentID %}"
+                                      class="d-inline">
+                                  {% csrf_token %}
+                                  <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                  <button type="submit" class="btn btn-outline-danger btn-sm">
+                                      Remove
+                                  </button>
+                                </form>
                             {% endif %}
                           </td>
                         </tr>

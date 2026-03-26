@@ -132,6 +132,10 @@
                           <span class="fw-semibold text-danger bg-danger-subtle px-2 py-1 rounded">
                             {{ item.new }}
                           </span>
+                        {% elif req.Status|lower == "superseded" %}
+                          <span class="text-muted">
+                            {{ item.new }}
+                          </span>
                         {% else %}
                           <span class="fw-semibold bg-light px-2 py-1 rounded">
                             {{ item.new }}

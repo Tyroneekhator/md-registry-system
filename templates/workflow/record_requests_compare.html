@@ -140,11 +140,23 @@
                             </thead>
                             <tbody>
                                 {% for change in changes %}
+                                    {% with old_val=change.old|default:"-" new_val=change.new|default:"-" %}
                                     <tr>
                                         <td>{{ change.field }}</td>
-                                        <td class="text-danger">{{ change.old|default:"-" }}</td>
-                                        <td class="text-success">{{ change.new|default:"-" }}</td>
+
+                                        <td>
+                                            <span class="{% if old_val != new_val %}text-old-changed{% endif %}">
+                                                {{ old_val }}
+                                            </span>
+                                        </td>
+
+                                        <td>
+                                            <span class="{% if old_val != new_val %}text-new-changed{% endif %}">
+                                                {{ new_val }}
+                                            </span> 
+                                        </td>
                                     </tr>
+                                    {% endwith %}
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -156,27 +168,34 @@
                 {% endif %}
             </div>
 
-            <!-- Actions -->
+
+
             <div class="d-flex justify-content-end gap-2">
                 <a href="{% url 'workflow:request_detail' req.RequestID %}"
-                   class="btn btn-outline-primary btn-sm">
+                class="btn btn-outline-primary btn-sm">
                     View Details
                 </a>
 
-                <form method="post"
-                      action="{% url 'workflow:request_approve' req.RequestID %}"
-                      class="d-inline">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-outline-success btn-sm">
-                        Approve
-                    </button>
-                </form>
+                {% if is_admin %}
+                    <form method="post"
+                        action="{% url 'workflow:request_approve' req.RequestID %}"
+                        class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-success btn-sm">
+                            Approve
+                        </button>
+                    </form>
 
-                <a href="{% url 'workflow:request_reject' req.RequestID %}"
-                   class="btn btn-outline-danger btn-sm">
-                    Reject
-                </a>
+                    <a href="{% url 'workflow:request_reject' req.RequestID %}"
+                    class="btn btn-outline-danger btn-sm">
+                        Reject
+                    </a>
+                {% endif %}
             </div>
+
+
+
+
 
         </div>
         {% endwith %}

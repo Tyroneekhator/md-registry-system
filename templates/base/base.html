@@ -14,6 +14,7 @@
 
     <link href="{% static 'css/styles.css' %}" rel="stylesheet">
     <link href="{% static 'css/admin_corporate.css' %}" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/workflow.css' %}">
 
     <!-- -------------------------------------------------- -->
     <!-- Meta Configuration                                 -->
@@ -41,8 +42,8 @@
         {% include "base/navbar.html" %}
     {% endif %}
 
-    <main class="{% if request.session.user_id %}py-3{% else %}py-4{% endif %}">
-        <div class="container">
+    <main class="flex-grow-1 {% if request.session.user_id %}py-3{% else %}py-4{% endif %}">
+        <div class="container-fluid px-4">
         {% include "base/messages.html" %}
         {% block content %}{% endblock %}
         </div>

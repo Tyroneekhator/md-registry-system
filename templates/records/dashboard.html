@@ -62,7 +62,7 @@
           {% for record in recent_records %}
             <tr>
               <td>
-                <a href="{% url 'records:record_detail' record.RecordID %}"
+                <a href="{% url 'records:record_detail' record.RecordID %}?from=dashboard"
                    class="text-decoration-none fw-semibold">
                   {{ record.Subject }}
                 </a>

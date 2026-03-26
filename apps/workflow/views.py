@@ -39,6 +39,27 @@ def _user_in_group(user, group_name: str) -> bool:
         UserID=user,
         GroupID__GroupName__iexact=group_name
     ).exists()
+    
+
+def _supersede_other_pending_requests(target_req, reviewer):
+    target_record = getattr(target_req, "TargetRecordID", None)
+    if not target_record:
+        return 0
+
+    others = ActionRequests.objects.filter(
+        TargetRecordID=target_record,
+        Status__iexact="pending",
+    ).exclude(RequestID=target_req.RequestID)
+
+    count = 0
+    for other in others:
+        other.Status = "Superseded"
+        other.ReviewedByUserID = reviewer
+        other.ReviewedAt = timezone.now()
+        other.save(update_fields=["Status", "ReviewedByUserID", "ReviewedAt"])
+        count += 1
+
+    return count
 
 
 def _is_admin(user) -> bool:
@@ -453,7 +474,7 @@ def request_detail_view(request, request_id):
 # CHANGED: admin compare page for all pending requests on one record
 # ============================================================
 @login_required_view
-@admin_required_view
+@admin_or_clerk_required_view
 def record_requests_compare_view(request, record_id):
     user = request.current_user
     record = get_object_or_404(Records, RecordID=record_id)
@@ -492,20 +513,17 @@ def request_approve_view(request, request_id):
 
     rec = req.TargetRecordID
     action = (req.RequestType or "").upper()
-    
+
+    # =========================================================
+    # CHANGED: initialize safely so variable always exists
+    # =========================================================
+    conflicting_pending_count = 0
+
     if rec is not None:
         conflicting_pending_count = ActionRequests.objects.filter(
             TargetRecordID=rec,
             Status__iexact="pending"
         ).count()
-
-    if conflicting_pending_count > 1:
-        messages.warning(
-            request,
-            "This record has multiple pending requests. Please review conflicts before approving."
-        )
-        return redirect("workflow:record_requests_compare", record_id=rec.RecordID)
-
 
     if action == "DELETE":
         _mark_record_deleted(rec, user=user)
@@ -619,10 +637,27 @@ def request_approve_view(request, request_id):
         )
 
     # =========================================================
-    # CHANGED: for any approved request, supersede the other
-    # pending requests for the same record. Single-request flow
-    # still works because this queryset is empty in that case.
+    # CHANGED: mark THIS request as approved first
+    # before superseding the others
     # =========================================================
+    req.Status = "approved"
+    req.ReviewedByUserID = user
+    req.ReviewedAt = timezone.now()
+
+    # =========================================================
+    # CHANGED: preserve current behavior for permanent delete
+    # =========================================================
+    if action == "PERMANENT_DELETE":
+        req.TargetRecordID = None
+
+    req.save()
+
+    # =========================================================
+    # CHANGED: AFTER saving approved request, supersede the
+    # other pending requests for the same record
+    # =========================================================
+    superseded_count = 0
+
     if rec is not None:
         other_pending = ActionRequests.objects.filter(
             TargetRecordID=rec,
@@ -634,17 +669,21 @@ def request_approve_view(request, request_id):
             other.ReviewedByUserID = user
             other.ReviewedAt = timezone.now()
 
+            # =================================================
+            # CHANGED: append system note to superseded request
+            # =================================================
+            system_note = (
+                f"[SYSTEM]: Superseded because RequestID={req.RequestID} "
+                f"was approved for the same record."
+            )
+
             if other.RequestDetails:
-                other.RequestDetails = (
-                    f"{other.RequestDetails}"
-                    f"[SYSTEM]: Superseded because RequestID={req.RequestID} was approved for the same record."
-                )
+                other.RequestDetails = f"{other.RequestDetails}\n{system_note}"
             else:
-                other.RequestDetails = (
-                    f"[SYSTEM]: Superseded because RequestID={req.RequestID} was approved for the same record."
-                )
+                other.RequestDetails = system_note
 
             other.save()
+            superseded_count += 1
 
             _audit(
                 request,
@@ -654,20 +693,18 @@ def request_approve_view(request, request_id):
                 target_request=other,
             )
 
-    req.Status = "approved"
-    req.ReviewedByUserID = user
-    req.ReviewedAt = timezone.now()
-    
-    if action == "PERMANENT_DELETE":
-        req.TargetRecordID = None
-    
-    req.save()
-    
-    
+    # =========================================================
+    # CHANGED: better success message when conflicts existed
+    # =========================================================
+    if superseded_count:
+        messages.success(
+            request,
+            f"Request approved. {superseded_count} conflicting request(s) were marked as superseded."
+        )
+    else:
+        messages.success(request, "Request approved.")
 
-    messages.success(request, "Request approved.")
     return redirect("workflow:request_detail", request_id=req.RequestID)
-
 
 # ============================================================
 # 5) request_reject_view
@@ -685,28 +722,68 @@ def request_reject_view(request, request_id):
         messages.error(request, "Rejection reason is required.")
         return redirect("workflow:request_reject", request_id=req.RequestID)
 
-    req.Status = "rejected"
+    # =========================================================
+    # CHANGED: detect whether conflicts are involved
+    # Conflict = there is at least one OTHER pending request
+    # for the same target record
+    # =========================================================
+    has_conflicts = False
+    if req.TargetRecordID:
+        has_conflicts = ActionRequests.objects.filter(
+            TargetRecordID=req.TargetRecordID,
+            Status__iexact="pending",
+        ).exclude(RequestID=req.RequestID).exists()
+
+    # =========================================================
+    # CHANGED: only mark as superseded when conflicts exist
+    # Otherwise keep normal rejected status
+    # =========================================================
+    if has_conflicts:
+        req.Status = "superseded"
+    else:
+        req.Status = "rejected"
+
     req.ReviewedByUserID = user
     req.ReviewedAt = timezone.now()
 
-    if req.RequestDetails:
-        req.RequestDetails = f"{req.RequestDetails}\n\n[REJECTION REASON]: {reason}"
+    # =========================================================
+    # CHANGED: store reason with label that matches final status
+    # =========================================================
+    if has_conflicts:
+        note = f"[SUPERSEDED REASON]: {reason}"
     else:
-        req.RequestDetails = f"[REJECTION REASON]: {reason}"
+        note = f"[REJECTION REASON]: {reason}"
+
+    if req.RequestDetails:
+        req.RequestDetails = f"{req.RequestDetails}\n\n{note}"
+    else:
+        req.RequestDetails = note
 
     req.save()
 
-    _audit(
-        request,
-        "REQUEST_REJECT",
-        f"Rejected RequestID={req.RequestID}. Reason: {reason[:200]}",
-        target_record=req.TargetRecordID,
-        target_request=req,
-    )
+    # =========================================================
+    # CHANGED: audit message now depends on conflict status
+    # =========================================================
+    if has_conflicts:
+        _audit(
+            request,
+            "REQUEST_SUPERSEDE",
+            f"Marked RequestID={req.RequestID} as superseded because conflicts existed. Reason: {reason[:200]}",
+            target_record=req.TargetRecordID,
+            target_request=req,
+        )
+        messages.success(request, "Request marked as superseded.")
+    else:
+        _audit(
+            request,
+            "REQUEST_REJECT",
+            f"Rejected RequestID={req.RequestID}. Reason: {reason[:200]}",
+            target_record=req.TargetRecordID,
+            target_request=req,
+        )
+        messages.success(request, "Request rejected.")
 
-    messages.success(request, "Request rejected.")
     return redirect("workflow:request_detail", request_id=req.RequestID)
-
 
 # ============================================================
 # 6) deleted_records_list_view

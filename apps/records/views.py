@@ -12,6 +12,7 @@ from django.conf import settings
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.utils import timezone
+from django.db import transaction
 
 from django.utils.text import get_valid_filename
 from django.http import HttpResponse, FileResponse, Http404
@@ -712,7 +713,6 @@ def record_detail_view(request, record_id):
 @clerk_or_admin_required_view
 def record_create_view(request):
     user = request.current_user
-    departments = Department.objects.all().order_by("DepartmentName")
 
     if request.method == "GET":
         return render(
@@ -721,20 +721,34 @@ def record_create_view(request):
             _record_form_context(request, user, mode="create")
         )
 
-    # ---- Required fields ----
+    # ============================================================
+    # 1) Read form fields
+    # ============================================================
     messenger_name = (request.POST.get("MessengerName") or "").strip()
     subject = (request.POST.get("Subject") or "").strip()
     description = (request.POST.get("Description") or "").strip()
     status = (request.POST.get("Status") or "").strip()
+
     external_document = (request.POST.get("ExternalDocument") or "No").strip()
     external_company_name_raw = (request.POST.get("external_company_name") or "").strip()
 
-    # Invoice number (allow commas)
     invoice_number_raw = (request.POST.get("InvoiceNumber") or "").strip()
     invoice_number_clean = invoice_number_raw.replace(",", "").strip()
 
     date_received = _parse_datetime_local(request.POST.get("DateReceived"))
+    date_dispatched = _parse_datetime_local(request.POST.get("DateDispatched"))
+    returned = (request.POST.get("Returned") or "").strip()
+    date_returned = _parse_date(request.POST.get("DateReturned"))
 
+    incoming_id = (request.POST.get("IncomingDepartmentID") or "").strip()
+    outgoing_id = (request.POST.get("OutgoingDepartmentID") or "").strip()
+    incoming_new = (request.POST.get("incoming_department_new") or "").strip()
+    outgoing_new = (request.POST.get("outgoing_department_new") or "").strip()
+
+    # ============================================================
+    # 2) Validate required fields FIRST
+    #    Under no circumstance should anything be created before this passes
+    # ============================================================
     if not messenger_name:
         messages.error(request, "Messenger name is required.")
         return render(
@@ -793,49 +807,42 @@ def record_create_view(request):
             _record_form_context(request, user, mode="create")
         )
 
-    # ---- Optional fields ----
-    date_dispatched = _parse_datetime_local(request.POST.get("DateDispatched"))
-    returned = (request.POST.get("Returned") or "").strip()
-    date_returned = _parse_date(request.POST.get("DateReturned"))
+    # ============================================================
+    # 3) Resolve departments WITHOUT creating anything yet
+    # ============================================================
+    incoming_dept = None
+    outgoing_dept = None
 
-    # ---- Departments: select existing OR create new ----
     if external_document == "Yes":
-        incoming_dept = None
-        outgoing_dept = None
+        # External document: departments are not required
+        incoming_id = ""
+        outgoing_id = ""
         incoming_new = ""
         outgoing_new = ""
     else:
-        incoming_id = (request.POST.get("IncomingDepartmentID") or "").strip()
-        outgoing_id = (request.POST.get("OutgoingDepartmentID") or "").strip()
-
-        incoming_new = (request.POST.get("incoming_department_new") or "").strip()
-        outgoing_new = (request.POST.get("outgoing_department_new") or "").strip()
-
-        incoming_dept = _get_or_create_department_by_name(
-            incoming_new,
-            description=description
-        )
-        outgoing_dept = _get_or_create_department_by_name(outgoing_new)
-
-        if not incoming_dept and incoming_id:
+        # Resolve existing departments only
+        if incoming_id:
             incoming_dept = Department.objects.filter(DepartmentID=incoming_id).first()
 
-        if not outgoing_dept and outgoing_id:
+        if outgoing_id:
             outgoing_dept = Department.objects.filter(DepartmentID=outgoing_id).first()
 
-    if external_document != "Yes" and not incoming_dept:
-        messages.error(request, "Incoming Department is required unless this is an external document.")
-        return render(
-            request,
-            "records/record_form.html",
-            _record_form_context(request, user, mode="create")
-        )
+        # Do not create new departments yet — just validate the names for now
+        if not incoming_dept and not incoming_new:
+            messages.error(request, "Incoming Department is required unless this is an external document.")
+            return render(
+                request,
+                "records/record_form.html",
+                _record_form_context(request, user, mode="create")
+            )
 
-    # ---- Business rules ----
-    status_norm = status.strip().lower()
+    # ============================================================
+    # 4) Business rules — validate everything before creating anything
+    # ============================================================
+    status_norm = status.lower()
     is_with_md = (status_norm == "with md")
 
-    if date_dispatched and not outgoing_dept:
+    if date_dispatched and not outgoing_dept and not outgoing_new and external_document != "Yes":
         messages.error(request, "Outgoing Department is required when Date Dispatched is filled.")
         return render(
             request,
@@ -860,50 +867,87 @@ def record_create_view(request):
                 _record_form_context(request, user, mode="create")
             )
 
-    # ---- Create related company only after validation succeeds ----
-    external_company_name = _get_or_create_external_company_name(
-        external_company_name_raw,
-        description=description
-    )
+    # Optional extra consistency rule
+    if date_returned and returned != "Yes":
+        messages.error(request, "Returned must be 'Yes' when Date Returned is filled.")
+        return render(
+            request,
+            "records/record_form.html",
+            _record_form_context(request, user, mode="create")
+        )
 
-    create_kwargs = dict(
-        MessengerName=messenger_name,
-        Subject=subject,
-        Description=description,
-        DateReceived=date_received,
-        InvoiceNumber=invoice_number_int,
-        IncomingDepartmentID=incoming_dept,
-        OutgoingDepartmentID=outgoing_dept,
-        ExternalDocument=external_document if external_document in ("Yes", "No") else "No",
-        ExternalCompanyName=external_company_name,
-        DateDispatched=date_dispatched,
-        Returned=returned if returned in ("Yes", "No") else None,
-        DateReturned=date_returned,
-        Status=status,
-    )
+    # ============================================================
+    # 5) Only NOW create related objects + record, inside one transaction
+    # ============================================================
+    try:
+        with transaction.atomic():
+            # Create/resolve departments only after all validation passes
+            if external_document != "Yes":
+                if not incoming_dept and incoming_new:
+                    incoming_dept = _get_or_create_department_by_name(
+                        incoming_new,
+                        description=description
+                    )
 
-    if hasattr(Record, "CreatedAt"):
-        create_kwargs["CreatedAt"] = timezone.now()
-    if hasattr(Record, "UpdatedAt"):
-        create_kwargs["UpdatedAt"] = timezone.now()
+                if not outgoing_dept and outgoing_new:
+                    outgoing_dept = _get_or_create_department_by_name(
+                        outgoing_new
+                    )
 
-    rec = Record.objects.create(**create_kwargs)
-
-    files = request.FILES.getlist("files")
-    if files and _ensure_media_root():
-        for f in files:
-            rel_path = _save_uploaded_file(rec.RecordID, f)
-            RecordAttachment.objects.create(
-                RecordID_id=rec.RecordID,
-                FilePath=rel_path,
-                OriginalFileName=f.name,
-                UploadedAt=timezone.now(),
-                UploadedByUserID=user,
+            # Create external company only after validation succeeds
+            external_company_name = _get_or_create_external_company_name(
+                external_company_name_raw,
+                description=description
             )
 
-    _audit(request, "RECORD_CREATE", f"Created record RecordID={rec.RecordID}", target_record=rec)
+            create_kwargs = dict(
+                MessengerName=messenger_name,
+                Subject=subject,
+                Description=description,
+                DateReceived=date_received,
+                InvoiceNumber=invoice_number_int,
+                IncomingDepartmentID=incoming_dept,
+                OutgoingDepartmentID=outgoing_dept,
+                ExternalDocument=external_document if external_document in ("Yes", "No") else "No",
+                ExternalCompanyName=external_company_name,
+                DateDispatched=date_dispatched,
+                Returned=returned if returned in ("Yes", "No") else None,
+                DateReturned=date_returned,
+                Status=status,
+            )
+
+            if hasattr(Record, "CreatedAt"):
+                create_kwargs["CreatedAt"] = timezone.now()
+            if hasattr(Record, "UpdatedAt"):
+                create_kwargs["UpdatedAt"] = timezone.now()
+
+            rec = Record.objects.create(**create_kwargs)
+
+            files = request.FILES.getlist("files")
+            if files and _ensure_media_root():
+                for f in files:
+                    rel_path = _save_uploaded_file(rec.RecordID, f)
+                    RecordAttachment.objects.create(
+                        RecordID_id=rec.RecordID,
+                        FilePath=rel_path,
+                        OriginalFileName=f.name,
+                        UploadedAt=timezone.now(),
+                        UploadedByUserID=user,
+                    )
+
+            _audit(request, "RECORD_CREATE", f"Created record RecordID={rec.RecordID}", target_record=rec)
+
+    except Exception:
+        messages.error(request, "Record could not be created. Please correct the form and try again.")
+        return render(
+            request,
+            "records/record_form.html",
+            _record_form_context(request, user, mode="create")
+        )
+
     messages.success(request, "Record created successfully.")
     return redirect("records:record_edit", record_id=rec.RecordID)
+
 # ============================================================
 # 6) record_edit_view (Clerk/Admin) — UPDATED FOR YOUR FIELDS + inline dept create
 # ============================================================
@@ -912,15 +956,15 @@ def record_edit_view(request, record_id):
     user = request.current_user
     rec = get_object_or_404(Record, RecordID=record_id)
 
-    # CORRECTION: prevent non-admin from viewing/editing deleted record
+    # Prevent non-admin from viewing/editing deleted record
     if hasattr(rec, "IsDeleted") and rec.IsDeleted and not _is_admin(user):
         return redirect("accounts:access_denied")
 
     departments = Department.objects.all().order_by("DepartmentName")
 
-    # =========================
+    # ============================================================
     # GET: show form + attachments
-    # =========================
+    # ============================================================
     if request.method == "GET":
         attachments = RecordAttachment.objects.filter(
             RecordID_id=rec.RecordID,
@@ -936,9 +980,9 @@ def record_edit_view(request, record_id):
             "is_clerk": _is_clerk(user),
         })
 
-    # =========================
-    # POST: read required fields
-    # =========================
+    # ============================================================
+    # POST: read all values first
+    # ============================================================
     messenger_name = (request.POST.get("MessengerName") or "").strip()
     subject = (request.POST.get("Subject") or "").strip()
     description = (request.POST.get("Description") or "").strip()
@@ -947,98 +991,199 @@ def record_edit_view(request, record_id):
     invoice_number_raw = (request.POST.get("InvoiceNumber") or "").strip()
     invoice_number_clean = invoice_number_raw.replace(",", "").strip()
 
-    date_received = _parse_datetime_local(request.POST.get("DateReceived"))
+    external_document = (request.POST.get("ExternalDocument") or "No").strip()
+    external_company_name_raw = (request.POST.get("external_company_name") or "").strip()
 
-    # CORRECTION: enforce required fields consistently
+    date_received = _parse_dt_local(request.POST.get("DateReceived"))
+    date_dispatched = _parse_dt_local(request.POST.get("DateDispatched"))
+    returned = (request.POST.get("Returned") or "").strip()
+    date_returned = _parse_d(request.POST.get("DateReturned"))
+
+    incoming_id = (request.POST.get("IncomingDepartmentID") or "").strip()
+    outgoing_id = (request.POST.get("OutgoingDepartmentID") or "").strip()
+    incoming_new = (request.POST.get("incoming_department_new") or "").strip()
+    outgoing_new = (request.POST.get("outgoing_department_new") or "").strip()
+
+    ALLOWED_STATUS = {"With MD", "Not with MD"}
+    ALLOWED_RETURNED = {"", "Yes", "No"}
+
+    attachments = RecordAttachment.objects.filter(
+        RecordID_id=rec.RecordID,
+        **_attachment_is_deleted_filter()
+    ).order_by("-AttachmentID")
+
+    def render_edit_with_error(msg):
+        messages.error(request, msg)
+
+        # Create a lightweight object carrying submitted values
+        class TempRecord:
+            pass
+
+        temp = TempRecord()
+        temp.RecordID = rec.RecordID
+        temp.MessengerName = messenger_name
+        temp.Subject = subject
+        temp.Description = description
+        temp.InvoiceNumber = invoice_number_raw
+        temp.DateReceived = date_received
+        temp.DateDispatched = date_dispatched
+        temp.Returned = returned
+        temp.DateReturned = date_returned
+        temp.Status = status
+        temp.ExternalDocument = external_document
+
+        # Preserve selected/typed external company for form re-render
+        temp.ExternalCompanyName = getattr(rec, "ExternalCompanyName", None)
+
+        # Preserve selected departments if possible
+        incoming_existing = Department.objects.filter(DepartmentID=incoming_id).first() if incoming_id else None
+        outgoing_existing = Department.objects.filter(DepartmentID=outgoing_id).first() if outgoing_id else None
+
+        temp.IncomingDepartmentID = incoming_existing
+        temp.OutgoingDepartmentID = outgoing_existing
+
+        return render(request, "records/record_form.html", {
+            "mode": "edit",
+            "record": temp,
+            "departments": departments,
+            "attachments": attachments,
+            "is_admin": _is_admin(user),
+            "is_clerk": _is_clerk(user),
+            "incoming_department_new_value": incoming_new,
+            "outgoing_department_new_value": outgoing_new,
+            "external_company_name_value": external_company_name_raw,
+        })
+
+    # ============================================================
+    # 1. Core required fields
+    # ============================================================
     if not messenger_name:
-        messages.error(request, "Messenger name is required.")
-        return redirect("records:record_edit", record_id=rec.RecordID)
-    if not subject:
-        messages.error(request, "Subject is required.")
-        return redirect("records:record_edit", record_id=rec.RecordID)
-    if not description:
-        messages.error(request, "Description is required.")
-        return redirect("records:record_edit", record_id=rec.RecordID)
-    if not invoice_number_clean:
-        messages.error(request, "Invoice number is required.")
-        return redirect("records:record_edit", record_id=rec.RecordID)
-    if not status:
-        messages.error(request, "Status is required.")
-        return redirect("records:record_edit", record_id=rec.RecordID)
-    if not date_received:
-        messages.error(request, "Date received is required (use the date picker).")
-        return redirect("records:record_edit", record_id=rec.RecordID)
+        return render_edit_with_error("Messenger name is required.")
 
-    # CORRECTION: invoice must be numeric
+    if not subject:
+        return render_edit_with_error("Subject is required.")
+
+    if not description:
+        return render_edit_with_error("Description is required.")
+
+    if not invoice_number_clean:
+        return render_edit_with_error("Invoice number is required.")
+
+    if not status:
+        return render_edit_with_error("Status is required.")
+
+    if not date_received:
+        return render_edit_with_error("Date received is required.")
+
+    # ============================================================
+    # 2. Invoice number rules
+    # ============================================================
     try:
         invoice_number_int = int(invoice_number_clean)
     except Exception:
-        messages.error(request, "Invoice number must be numeric (commas allowed).")
-        return redirect("records:record_edit", record_id=rec.RecordID)
+        return render_edit_with_error("Invoice number must be numeric. Commas are allowed in input.")
 
-    # =========================
-    # POST: optional fields
-    # =========================
-    date_dispatched = _parse_datetime_local(request.POST.get("DateDispatched"))
-    returned = (request.POST.get("Returned") or "").strip()
-    date_returned = _parse_date(request.POST.get("DateReturned"))
+    if invoice_number_int <= 0:
+        return render_edit_with_error("Invoice number must be greater than zero.")
 
-    # =========================
-    # Departments
-    # =========================
-    external_document = (request.POST.get("ExternalDocument") or "No").strip()
-    external_company_name_raw = (request.POST.get("external_company_name") or "").strip()
-    external_company_name = _get_or_create_external_company_name(external_company_name_raw)
-    if external_document == "Yes":
-        incoming_dept = None
-        outgoing_dept = None
-        incoming_new = ""
-        outgoing_new = ""
-    else:
-        incoming_id = (request.POST.get("IncomingDepartmentID") or "").strip()
-        outgoing_id = (request.POST.get("OutgoingDepartmentID") or "").strip()
+    duplicate_qs = Record.objects.filter(InvoiceNumber=invoice_number_int).exclude(RecordID=rec.RecordID)
+    if hasattr(Record, "IsDeleted"):
+        duplicate_qs = duplicate_qs.filter(IsDeleted=False)
 
-        incoming_new = (request.POST.get("incoming_department_new") or "").strip()
-        outgoing_new = (request.POST.get("outgoing_department_new") or "").strip()
-
-        incoming_dept = _get_or_create_department_by_name(incoming_new)
-        outgoing_dept = _get_or_create_department_by_name(outgoing_new)
-
-        if not incoming_dept and incoming_id:
-            incoming_dept = Department.objects.filter(DepartmentID=incoming_id).first()
-
-        if not outgoing_dept and outgoing_id:
-            outgoing_dept = Department.objects.filter(DepartmentID=outgoing_id).first()
-
-    if external_document != "Yes" and not incoming_dept:
-        messages.error(request, "Incoming Department is required unless this is an external document.")
-        return redirect("records:record_edit", record_id=rec.RecordID)
-
-    # =========================
-    # Conditional validations
-    # =========================
-    status_norm = status.strip().lower()
-    is_with_md = (status_norm == "with md")
-
-    if status_norm == "not with md":
-        returned = ""
-        date_returned = None
-
-    if date_dispatched and not outgoing_dept:
-        messages.error(request, "Outgoing Department is required when Date Dispatched is filled.")
-        return redirect("records:record_edit", record_id=rec.RecordID)
-
-    if date_dispatched and is_with_md:
-        if returned != "Yes":
-            messages.error(request, "Returned must be 'Yes' when Status is 'With MD' and Date Dispatched is filled.")
-            return redirect("records:record_edit", record_id=rec.RecordID)
-        if not date_returned:
-            messages.error(request, "Date Returned is required when Status is 'With MD' and Date Dispatched is filled.")
-            return redirect("records:record_edit", record_id=rec.RecordID)
+    if duplicate_qs.exists():
+        return render_edit_with_error("A record with this invoice number already exists.")
 
     # ============================================================
-    # CORRECTION: capture OLD values BEFORE changing the record
-    # This is what makes old → new comparison work for pending requests
+    # 3. Choice validation
+    # ============================================================
+    if status not in ALLOWED_STATUS:
+        return render_edit_with_error("Status must be either 'With MD' or 'Not with MD'.")
+
+    if returned not in ALLOWED_RETURNED:
+        return render_edit_with_error("Returned must be blank, 'Yes', or 'No'.")
+
+    if external_document not in ("Yes", "No"):
+        external_document = "No"
+
+    # ============================================================
+    # 4. External document / company rules
+    # ============================================================
+    if external_document == "Yes":
+        if not external_company_name_raw:
+            return render_edit_with_error("External company name is required for external documents.")
+
+        incoming_id = ""
+        outgoing_id = ""
+        incoming_new = ""
+        outgoing_new = ""
+
+    # ============================================================
+    # 5. Resolve existing departments only (do NOT create yet)
+    # ============================================================
+    incoming_dept = None
+    outgoing_dept = None
+
+    if external_document != "Yes":
+        if incoming_id:
+            incoming_dept = Department.objects.filter(DepartmentID=incoming_id).first()
+
+        if outgoing_id:
+            outgoing_dept = Department.objects.filter(DepartmentID=outgoing_id).first()
+
+        if not incoming_dept and not incoming_new:
+            return render_edit_with_error("Incoming Department is required unless this is an external document.")
+
+    # ============================================================
+    # 6. Dispatch / outgoing department rules
+    # ============================================================
+    if date_dispatched:
+        if external_document != "Yes" and not outgoing_dept and not outgoing_new:
+            return render_edit_with_error("Outgoing Department is required when Date Dispatched is filled.")
+
+        if returned == "":
+            return render_edit_with_error("Returned must be selected when Date Dispatched is filled.")
+
+    # ============================================================
+    # 7. Returned / date returned rules
+    # ============================================================
+    if returned == "Yes" and not date_returned:
+        return render_edit_with_error("Date Returned is required when Returned is 'Yes'.")
+
+    if returned == "No" and date_returned:
+        return render_edit_with_error("Date Returned must be empty when Returned is 'No'.")
+
+    if date_returned and returned != "Yes":
+        return render_edit_with_error("Returned must be 'Yes' when Date Returned is filled.")
+
+    # ============================================================
+    # 8. Status-specific rule
+    # ============================================================
+    if status == "With MD" and date_dispatched:
+        if returned != "Yes":
+            return render_edit_with_error("Returned must be 'Yes' when Status is 'With MD' and Date Dispatched is filled.")
+
+        if not date_returned:
+            return render_edit_with_error("Date Returned is required when Status is 'With MD' and Date Dispatched is filled.")
+
+    # ============================================================
+    # 9. Date order rules
+    # ============================================================
+    if date_dispatched and date_dispatched < date_received:
+        return render_edit_with_error("Date Dispatched cannot be earlier than Date Received.")
+
+    if date_returned:
+        received_date = date_received.date() if hasattr(date_received, "date") else date_received
+
+        if date_returned < received_date:
+            return render_edit_with_error("Date Returned cannot be earlier than Date Received.")
+
+        if date_dispatched:
+            dispatched_date = date_dispatched.date() if hasattr(date_dispatched, "date") else date_dispatched
+            if date_returned < dispatched_date:
+                return render_edit_with_error("Date Returned cannot be earlier than Date Dispatched.")
+
+    # ============================================================
+    # 10. Capture OLD values before any change
     # ============================================================
     old_messenger_name = rec.MessengerName
     old_subject = rec.Subject
@@ -1055,8 +1200,16 @@ def record_edit_view(request, record_id):
     old_status = rec.Status
 
     # ============================================================
-    # CORRECTION: Clerk edits become approval requests
-    # IMPORTANT: do NOT update rec before creating the request
+    # 11. Prepare resolved names for request or save
+    # ============================================================
+    incoming_existing_name = getattr(incoming_dept, "DepartmentName", "") if incoming_dept else ""
+    outgoing_existing_name = getattr(outgoing_dept, "DepartmentName", "") if outgoing_dept else ""
+
+    final_incoming_name = incoming_existing_name or incoming_new
+    final_outgoing_name = outgoing_existing_name or outgoing_new
+
+    # ============================================================
+    # 12. Clerk edits become approval requests only
     # ============================================================
     if _is_clerk(user):
         def fmt_dt(v):
@@ -1075,21 +1228,17 @@ def record_edit_view(request, record_id):
             except Exception:
                 return str(v)
 
-        new_incoming_department = getattr(incoming_dept, "DepartmentName", "") if incoming_dept else ""
-        new_outgoing_department = getattr(outgoing_dept, "DepartmentName", "") if outgoing_dept else ""
-
         change_lines = [
             "EDIT REQUEST",
             f"RecordID={rec.RecordID}",
             "",
-            # CORRECTION: old value on left, submitted new value on right
             f"CHANGE|MessengerName|{old_messenger_name or ''}|{messenger_name}",
             f"CHANGE|Subject|{old_subject or ''}|{subject}",
             f"CHANGE|Description|{old_description or ''}|{description}",
             f"CHANGE|DateReceived|{fmt_dt(old_date_received)}|{fmt_dt(date_received)}",
             f"CHANGE|InvoiceNumber|{old_invoice_number if old_invoice_number is not None else ''}|{invoice_number_int}",
-            f"CHANGE|IncomingDepartment|{old_incoming_department}|{new_incoming_department}",
-            f"CHANGE|OutgoingDepartment|{old_outgoing_department}|{new_outgoing_department}",
+            f"CHANGE|IncomingDepartment|{old_incoming_department}|{final_incoming_name}",
+            f"CHANGE|OutgoingDepartment|{old_outgoing_department}|{final_outgoing_name}",
             f"CHANGE|DateDispatched|{fmt_dt(old_date_dispatched)}|{fmt_dt(date_dispatched)}",
             f"CHANGE|Returned|{old_returned or ''}|{returned if returned in ('Yes', 'No') else ''}",
             f"CHANGE|DateReturned|{fmt_date(old_date_returned)}|{fmt_date(date_returned)}",
@@ -1118,48 +1267,71 @@ def record_edit_view(request, record_id):
         return redirect("workflow:requests_list")
 
     # ============================================================
-    # CORRECTION: Admin edits apply immediately
-    # Only admins should directly modify and save the record here
+    # 13. Admin edits apply immediately
     # ============================================================
-    rec.MessengerName = messenger_name
-    rec.Subject = subject
-    rec.Description = description
-    rec.DateReceived = date_received
-    rec.InvoiceNumber = invoice_number_int
-    rec.IncomingDepartmentID = incoming_dept
-    rec.OutgoingDepartmentID = outgoing_dept
-    rec.ExternalDocument = external_document if external_document in ("Yes", "No") else "No"
-    rec.ExternalCompanyName = external_company_name
-    rec.IncomingDepartmentID = incoming_dept
-    rec.OutgoingDepartmentID = outgoing_dept
-    rec.DateDispatched = date_dispatched
-    rec.Returned = returned if returned in ("Yes", "No") else None
-    rec.DateReturned = date_returned
-    rec.Status = status
+    try:
+        with transaction.atomic():
+            # Create departments only after all validation passes
+            if external_document != "Yes":
+                if not incoming_dept and incoming_new:
+                    incoming_dept = _get_or_create_department_by_name(
+                        incoming_new,
+                        description=description
+                    )
 
-    if hasattr(rec, "UpdatedAt"):
-        rec.UpdatedAt = timezone.now()
+                if not outgoing_dept and outgoing_new:
+                    outgoing_dept = _get_or_create_department_by_name(
+                        outgoing_new
+                    )
 
-    rec.save()
+            # Create external company only after all validation passes
+            external_company_name = None
+            if external_document == "Yes":
+                external_company_name = _get_or_create_external_company_name(
+                    external_company_name_raw,
+                    description=description
+                )
 
-    files = request.FILES.getlist("files")
-    if files and _ensure_media_root():
-        for f in files:
-            rel_path = _save_uploaded_file(rec.RecordID, f)
-            RecordAttachment.objects.create(
-                RecordID_id=rec.RecordID,
-                FilePath=rel_path,
-                OriginalFileName=f.name,
-                UploadedAt=timezone.now(),
-                UploadedByUserID=user,
+            rec.MessengerName = messenger_name
+            rec.Subject = subject
+            rec.Description = description
+            rec.DateReceived = date_received
+            rec.InvoiceNumber = invoice_number_int
+            rec.IncomingDepartmentID = incoming_dept
+            rec.OutgoingDepartmentID = outgoing_dept
+            rec.ExternalDocument = external_document
+            rec.ExternalCompanyName = external_company_name
+            rec.DateDispatched = date_dispatched
+            rec.Returned = returned if returned in ("Yes", "No") else None
+            rec.DateReturned = date_returned
+            rec.Status = status
+
+            if hasattr(rec, "UpdatedAt"):
+                rec.UpdatedAt = timezone.now()
+
+            rec.save()
+
+            files = request.FILES.getlist("files")
+            if files and _ensure_media_root():
+                for f in files:
+                    rel_path = _save_uploaded_file(rec.RecordID, f)
+                    RecordAttachment.objects.create(
+                        RecordID_id=rec.RecordID,
+                        FilePath=rel_path,
+                        OriginalFileName=f.name,
+                        UploadedAt=timezone.now(),
+                        UploadedByUserID=user,
+                    )
+
+            _audit(
+                request,
+                "RECORD_EDIT",
+                f"Admin edited record RecordID={rec.RecordID}",
+                target_record=rec
             )
 
-    _audit(
-        request,
-        "RECORD_EDIT",
-        f"Admin edited record RecordID={rec.RecordID}",
-        target_record=rec
-    )
+    except Exception:
+        return render_edit_with_error("Record could not be updated. Please correct the form and try again.")
 
     messages.success(request, "Record updated successfully.")
     return redirect("records:record_edit", record_id=rec.RecordID)
@@ -1554,6 +1726,10 @@ def attachment_pdf_view(request, attachment_id):
 @clerk_or_admin_required_view
 def attachment_delete_view(request, attachment_id):
     user = request.current_user
+    
+    if request.method != "POST":
+        raise Http404()
+    
     att = get_object_or_404(RecordAttachment, AttachmentID=attachment_id)
     rec_id = att.RecordID_id
 
@@ -1577,6 +1753,11 @@ def attachment_delete_view(request, attachment_id):
         _audit(request, "ATTACHMENT_DELETE", f"Deleted AttachmentID={attachment_id}")
 
     messages.success(request, "Attachment removed.")
+    
+    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER")
+    if next_url:
+        return redirect(next_url)
+    
     return redirect("records:record_detail", record_id=rec_id)
 
 

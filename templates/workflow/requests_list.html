@@ -91,13 +91,13 @@
                        placeholder="Request type / details / requester">
             </div>
 
-            <div class="col-md-2 text-end">
+            <div class="col-md-2 d-flex gap-2">
                 <button type="submit" class="btn btn-outline-secondary btn-sm">
                     Filter
                 </button>
 
                 <a href="{% url 'workflow:requests_list' %}"
-                   class="btn btn-outline-secondary btn-sm">
+                    class="btn btn-outline-secondary btn-sm">
                     Reset
                 </a>
             </div>
@@ -193,7 +193,11 @@
                                 {% if req.pending_for_same_record > 1 %}
                                     <a href="{% url 'workflow:record_requests_compare' req.TargetRecordID.RecordID %}"
                                     class="btn btn-outline-warning btn-sm">
-                                        Review Conflicts
+                                        {% if is_admin %}
+                                            Review Conflicts
+                                        {% else %}
+                                            View Conflicts
+                                        {% endif %}
                                     </a>
                                 {% else %}
                                     <a href="{% url 'workflow:request_detail' req.RequestID %}"
