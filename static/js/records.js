@@ -48,19 +48,36 @@
     const hasFilters = Array.from(parsedUrl.searchParams.keys()).length > 0;
     const exportBaseUrl = exportBtn.dataset.exportBase || "";
 
+    function fullyRemoveTooltipState(el) {
+      if (!el || !window.bootstrap || !window.bootstrap.Tooltip) return;
+
+      const instance = bootstrap.Tooltip.getInstance(el);
+      if (instance) {
+        instance.hide();
+        instance.dispose();
+      }
+
+      el.removeAttribute("data-bs-toggle");
+      el.removeAttribute("data-bs-placement");
+      el.removeAttribute("data-bs-custom-class");
+      el.removeAttribute("title");
+      el.removeAttribute("data-bs-original-title");
+      el.removeAttribute("aria-describedby");
+      el._mdTooltipInitialized = false;
+    }
+
     if (hasFilters && exportBaseUrl) {
       exportBtn.classList.remove("disabled");
-      exportBtn.removeAttribute("aria-disabled");
+      exportBtn.setAttribute("aria-disabled", "false");
       exportBtn.href = `${exportBaseUrl}?${parsedUrl.searchParams.toString()}`;
 
-      wrapper.removeAttribute("data-bs-toggle");
-      wrapper.removeAttribute("data-bs-placement");
-      wrapper.removeAttribute("data-bs-custom-class");
-      wrapper.removeAttribute("title");
+      fullyRemoveTooltipState(wrapper);
     } else {
       exportBtn.classList.add("disabled");
       exportBtn.setAttribute("aria-disabled", "true");
       exportBtn.href = "javascript:void(0);";
+
+      fullyRemoveTooltipState(wrapper);
 
       wrapper.setAttribute("data-bs-toggle", "tooltip");
       wrapper.setAttribute("data-bs-placement", "top");
@@ -69,12 +86,11 @@
         "title",
         "Works only when records are filtered or sorted.",
       );
+
+      wrapper._mdTooltipInitialized = false;
+      initBootstrapTooltips();
     }
-
-    initBootstrapTooltips();
   }
-
-
     // ============================================================
   // CORRECTION: bulk selection helpers
   // ============================================================

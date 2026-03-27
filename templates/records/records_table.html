@@ -28,21 +28,23 @@
       </a>
         
       <span
-        id="exportFilteredWrapper"
-        {% if not request.GET %}
-          data-bs-toggle="tooltip"
-          data-bs-placement="top"
-          data-bs-custom-class="tooltip-dark"
-          title="Works only when records are filtered or sorted."
-        {% endif %}
-      >
-        <a id="exportFilteredBtn"
-          data-export-base="{% url 'records:records_export_excel' %}"
-          class="btn btn-outline-success btn-sm {% if not request.GET %}disabled{% endif %}"
-          href="{% if request.GET %}{% url 'records:records_export_excel' %}?{{ request.GET.urlencode }}{% else %}javascript:void(0);{% endif %}">
-          Export Filtered Records
-        </a>
+          id="exportFilteredWrapper"
+          {% if not request.GET %}
+            data-bs-toggle="tooltip"
+            data-bs-placement="top"
+            data-bs-custom-class="tooltip-dark"
+            title="Works only when records are filtered or sorted."
+          {% endif %}
+        >
+          <a id="exportFilteredBtn"
+            data-export-base="{% url 'records:records_export_excel' %}"
+            class="btn btn-outline-success btn-sm {% if not request.GET %}disabled{% endif %}"
+            aria-disabled="{% if not request.GET %}true{% else %}false{% endif %}"
+            href="{% if request.GET %}{% url 'records:records_export_excel' %}?{{ request.GET.urlencode }}{% else %}javascript:void(0);{% endif %}">
+            Export Filtered Records
+          </a>
       </span>
+
       {% if is_admin or is_clerk %}
         <a href="{% url 'records:records_import' %}" class="btn btn-outline-secondary btn-sm">
           Import Excel
