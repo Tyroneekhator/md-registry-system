@@ -382,7 +382,6 @@
     }
   }
 
-
   function updateReturnUi() {
     const statusSelect = document.getElementById("statusSelect");
     const dateDispatchedInput = document.getElementById("dateDispatchedInput");
@@ -398,19 +397,19 @@
       return;
     }
 
-    const status = (statusSelect.value || "").trim();
     const hasDateDispatched = (dateDispatchedInput.value || "").trim() !== "";
-    const isWithMd = status === "With MD";
-    const isNotWithMd = status === "Not with MD";
 
     // Default state
+    statusSelect.disabled = false;
     returnedSelect.disabled = false;
     dateReturnedInput.disabled = false;
     returnedSelect.required = false;
     dateReturnedInput.required = false;
 
-    // If status is Not with MD, clear and disable return fields
-    if (isNotWithMd) {
+    // New rule:
+    // If no Date Dispatched -> Status = With MD, Returned blank, Date Returned blank
+    if (!hasDateDispatched) {
+      statusSelect.value = "With MD";
       returnedSelect.value = "";
       dateReturnedInput.value = "";
       returnedSelect.disabled = true;
@@ -418,10 +417,27 @@
       return;
     }
 
-    // If dispatched and With MD, enforce return fields
-    if (hasDateDispatched && isWithMd) {
+    const status = (statusSelect.value || "").trim();
+    const isWithMd = status === "With MD";
+    const isNotWithMd = status === "Not with MD";
+
+    // Date Dispatched + Not with MD -> force Returned = No
+    if (isNotWithMd) {
+      returnedSelect.value = "No";
+      dateReturnedInput.value = "";
+      returnedSelect.disabled = true;
+      dateReturnedInput.disabled = true;
+      return;
+    }
+
+    // Date Dispatched + With MD -> force Returned = Yes and require Date Returned
+    if (isWithMd) {
+      returnedSelect.value = "Yes";
+      returnedSelect.disabled = true;
+      dateReturnedInput.disabled = false;
       returnedSelect.required = true;
       dateReturnedInput.required = true;
+      return;
     }
   }
 

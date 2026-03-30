@@ -841,6 +841,20 @@ def record_create_view(request):
     # ============================================================
     status_norm = status.lower()
     is_with_md = (status_norm == "with md")
+    is_not_with_md = (status_norm == "not with md")
+
+    # New rule:
+    # If Date Dispatched is empty, force:
+    # - Status = With MD
+    # - Returned = blank
+    # - Date Returned = blank
+    if not date_dispatched:
+        status = "With MD"
+        status_norm = "with md"
+        is_with_md = True
+        is_not_with_md = False
+        returned = ""
+        date_returned = None
 
     if date_dispatched and not outgoing_dept and not outgoing_new and external_document != "Yes":
         messages.error(request, "Outgoing Department is required when Date Dispatched is filled.")
@@ -850,15 +864,14 @@ def record_create_view(request):
             _record_form_context(request, user, mode="create")
         )
 
-    if date_dispatched and is_with_md:
-        if returned != "Yes":
-            messages.error(request, "Returned must be 'Yes' when Status is 'With MD' and Date Dispatched is filled.")
-            return render(
-                request,
-                "records/record_form.html",
-                _record_form_context(request, user, mode="create")
-            )
+    # If dispatched and Status = Not with MD -> Returned = No, Date Returned blank
+    if date_dispatched and is_not_with_md:
+        returned = "No"
+        date_returned = None
 
+    # If dispatched and Status = With MD -> Returned = Yes, Date Returned required
+    if date_dispatched and is_with_md:
+        returned = "Yes"
         if not date_returned:
             messages.error(request, "Date Returned is required when Status is 'With MD' and Date Dispatched is filled.")
             return render(
@@ -875,7 +888,6 @@ def record_create_view(request):
             "records/record_form.html",
             _record_form_context(request, user, mode="create")
         )
-
     # ============================================================
     # 5) Only NOW create related objects + record, inside one transaction
     # ============================================================
@@ -1006,6 +1018,8 @@ def record_edit_view(request, record_id):
 
     ALLOWED_STATUS = {"With MD", "Not with MD"}
     ALLOWED_RETURNED = {"", "Yes", "No"}
+    is_with_md = (status == "With MD")
+    is_not_with_md = (status == "Not with MD")
 
     attachments = RecordAttachment.objects.filter(
         RecordID_id=rec.RecordID,
@@ -1140,31 +1154,23 @@ def record_edit_view(request, record_id):
         if external_document != "Yes" and not outgoing_dept and not outgoing_new:
             return render_edit_with_error("Outgoing Department is required when Date Dispatched is filled.")
 
-        if returned == "":
-            return render_edit_with_error("Returned must be selected when Date Dispatched is filled.")
-
     # ============================================================
     # 7. Returned / date returned rules
     # ============================================================
-    if returned == "Yes" and not date_returned:
-        return render_edit_with_error("Date Returned is required when Returned is 'Yes'.")
+    if date_dispatched and is_not_with_md:
+        returned = "No"
+        date_returned = None
+
+    if date_dispatched and is_with_md:
+        returned = "Yes"
+        if not date_returned:
+            return render_edit_with_error("Date Returned is required when Status is 'With MD' and Date Dispatched is filled.")
 
     if returned == "No" and date_returned:
         return render_edit_with_error("Date Returned must be empty when Returned is 'No'.")
 
     if date_returned and returned != "Yes":
         return render_edit_with_error("Returned must be 'Yes' when Date Returned is filled.")
-
-    # ============================================================
-    # 8. Status-specific rule
-    # ============================================================
-    if status == "With MD" and date_dispatched:
-        if returned != "Yes":
-            return render_edit_with_error("Returned must be 'Yes' when Status is 'With MD' and Date Dispatched is filled.")
-
-        if not date_returned:
-            return render_edit_with_error("Date Returned is required when Status is 'With MD' and Date Dispatched is filled.")
-
     # ============================================================
     # 9. Date order rules
     # ============================================================
@@ -2094,28 +2100,35 @@ def records_import_excel_view(request):
             errors.append(f"Row {row_idx}: Status must be 'With MD' or 'Not with MD'.")
             continue
 
-        # If Date Dispatched => Outgoing Department required
+        if not date_dispatched:
+            status = "With MD"
+            returned = ""
+            date_returned = None
+
+        # If Date Dispatched is filled -> Outgoing Department required
         if date_dispatched and not outgoing_dept:
             failed += 1
             errors.append(f"Row {row_idx}: OutgoingDepartmentName is required when DateDispatched is filled.")
             continue
 
-        # If dispatched AND With MD => Returned must be Yes and DateReturned required
+        # If dispatched AND Not with MD -> force Returned = No and clear DateReturned
+        if date_dispatched and status == "Not with MD":
+            returned = "No"
+            date_returned = None
+
+        # If dispatched AND With MD -> force Returned = Yes and require DateReturned
         if date_dispatched and status == "With MD":
-            if returned != "Yes":
-                failed += 1
-                errors.append(f"Row {row_idx}: Returned must be 'Yes' when Status is 'With MD' and DateDispatched is filled.")
-                continue
+            returned = "Yes"
             if not date_returned:
                 failed += 1
                 errors.append(f"Row {row_idx}: DateReturned is required when Status is 'With MD' and DateDispatched is filled.")
                 continue
 
-        # If Not with MD => clear returned fields (avoid stale data)
-        if status == "Not with MD":
-            returned = ""
-            date_returned = None
-
+        # Consistency check
+        if date_returned and returned != "Yes":
+            failed += 1
+            errors.append(f"Row {row_idx}: Returned must be 'Yes' when DateReturned is filled.")
+            continue
         # -----------------------------
         # ✅ Duplicate detection (skip duplicates)
         # Key: InvoiceNumber + DateReceived(date) + IncomingDept + Subject
