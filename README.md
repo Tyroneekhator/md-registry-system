@@ -149,6 +149,7 @@ MDRegistry/
 ## Core apps overview
 
 ### `apps.accounts`
+
 Handles:
 
 - authentication screens
@@ -158,12 +159,14 @@ Handles:
 - role detection via session-based current user lookup
 
 ### `apps.organization`
+
 Handles:
 
 - departments
 - external companies
 
 ### `apps.records`
+
 Handles:
 
 - dashboard and home pages
@@ -173,6 +176,7 @@ Handles:
 - Excel import/export
 
 ### `apps.workflow`
+
 Handles:
 
 - action requests
