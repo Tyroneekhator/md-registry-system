@@ -66,7 +66,13 @@
         {% if not record.IsDeleted %}
           <form method="post" action="{% url 'records:record_soft_delete' record.RecordID %}" class="d-inline">
             {% csrf_token %}
-            <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
+            <button type="submit" class="btn btn-outline-danger btn-sm">
+              {% if is_clerk and not is_admin %}
+                Request Delete
+              {% else %}
+                Delete
+              {% endif %}
+            </button>
           </form>
         {% endif %}
 
