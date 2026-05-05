@@ -255,6 +255,9 @@ These are **not currently listed** in the checked-in `requirements.txt`, so make
 
 **Windows:**
 
+right-click the MD registry folder ---> open integrated terminal,
+then you run what is in 'bash' below in the terminal
+
 ```bash
 python -m venv venv
 venv\Scripts\activate
@@ -325,7 +328,7 @@ Because this project appears to map to an existing SQL Server schema, use migrat
 
 ### 7. Start the development server
 
-right-click the MD registry folder ---> open integrated terminal,
+Under MD registry in the terminal ---> open integrated terminal,
 then you run what is in 'bash' below in the terminal
 
 ```bash
