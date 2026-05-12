@@ -260,7 +260,7 @@ then you run what is in 'bash' below in the terminal
 
 ```bash
 python -m venv venv
-venv\Scripts\activate
+..\venv\Scripts\Activate.ps1 
 ```
 
 ### 2. Install dependencies
