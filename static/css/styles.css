@@ -7,3 +7,62 @@
 .tooltip-dark.bs-tooltip-bottom .tooltip-arrow::before { border-bottom-color: #000; }
 .tooltip-dark.bs-tooltip-start .tooltip-arrow::before { border-left-color: #000; }
 .tooltip-dark.bs-tooltip-end .tooltip-arrow::before { border-right-color: #000; }
+
+
+/* ==================================================
+   Public Navbar Auth Buttons
+   CHANGE:
+   Makes the Sign Up and Login links more visible
+   in the top-right navbar.
+   ================================================== */
+
+.navbar .public-auth-link {
+  font-weight: 600;
+  font-size: 0.875rem;
+  padding: 5px 10px !important;
+  border-radius: 6px;
+  text-decoration: none;
+  line-height: 1.2;
+  transition: all 0.2s ease-in-out;
+}
+
+/* Sign Up button */
+.navbar .public-signup-link {
+  color: #ffffff !important;
+  background-color: #0d6efd;
+  border: 1px solid #0d6efd;
+  box-shadow: 0 2px 6px rgba(13, 110, 253, 0.25);
+}
+
+/* Login button */
+.navbar .public-login-link {
+  color: #0d6efd !important;
+  background-color: #ffffff;
+  border: 1px solid #0d6efd;
+}
+
+/* Hover and keyboard focus effect for Sign Up */
+.navbar .public-signup-link:hover,
+.navbar .public-signup-link:focus {
+  color: #ffffff !important;
+  background-color: #0b5ed7;
+  border-color: #0a58ca;
+  transform: translateY(-1px);
+}
+
+/* Hover and keyboard focus effect for Login */
+.navbar .public-login-link:hover,
+.navbar .public-login-link:focus {
+  color: #ffffff !important;
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+  transform: translateY(-1px);
+}
+
+/* Small-screen spacing for the auth buttons after navbar collapse */
+@media (max-width: 991.98px) {
+  .navbar .public-auth-link {
+    display: inline-block;
+    margin-top: 8px;
+  }
+}

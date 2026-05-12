@@ -137,16 +137,16 @@
                     <!-- CHANGE:
                          Added Sign Up link for visitors who are not logged in.
                          This allows new users to request an account. -->
-                    <li class="nav-item">
-                        <a class="nav-link"
-                           href="{% url 'accounts:signup' %}">
+                    <li class="nav-item me-2">
+                        <a class="nav-link public-auth-link public-signup-link"
+                        href="{% url 'accounts:signup' %}">
                             Sign Up
                         </a>
                     </li>
 
                     <li class="nav-item">
-                        <a class="nav-link"
-                           href="{% url 'accounts:login' %}">
+                        <a class="nav-link public-auth-link public-login-link"
+                        href="{% url 'accounts:login' %}">
                             Login
                         </a>
                     </li>
