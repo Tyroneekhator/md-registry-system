@@ -3,10 +3,9 @@ from django.contrib import messages
 from django.utils import timezone
 from django.db.models import Q
 
-
 from django.contrib.auth.hashers import check_password, make_password
 
-# --- Import your models (adjust names/paths if yours differ) ---
+# --- Import your models ---
 from apps.accounts.models import (
     Users, Groups, Permissions, UserGroups, GroupPermissions
 )
@@ -30,32 +29,39 @@ def _norm_user(u: Users):
 
     return u
 
+
 def _norm_group(g: Groups):
     if not g:
         return g
+
     g.group_id = g.GroupID
     g.name = g.GroupName
-    
-    
-    # ✅ FIX: add descriptions (since Groups table has no Description column)
+
+    # CHANGE:
+    # Added template-friendly role descriptions because the Groups table
+    # does not have a Description column.
     role_descriptions = {
         "Admin": "Full system access: users, roles, restore deleted records, audit oversight.",
         "Clerk": "Can create/edit records, upload attachments, and perform day-to-day registry operations.",
         "Viewer": "Read-only access: can view records and dashboards but cannot modify data.",
     }
     g.description = role_descriptions.get(g.name, "")
-    
+
     return g
 
 
 def _norm_permission(p: Permissions):
     if not p:
         return p
+
     p.id = p.PermissionID
     p.code = p.PermissionCode
-    # ✅ FIX: template-friendly aliases
+
+    # CHANGE:
+    # Added template-friendly aliases.
     p.name = p.PermissionCode
     p.description = p.Description
+
     return p
 
 
@@ -66,6 +72,7 @@ def _get_current_user(request):
     user_id = request.session.get("user_id")
     if not user_id:
         return None
+
     try:
         return _norm_user(Users.objects.get(UserID=user_id, IsActive=True))
     except Users.DoesNotExist:
@@ -75,11 +82,6 @@ def _get_current_user(request):
 def _get_user_groups(user: Users):
     """
     Returns a queryset of Groups the user belongs to.
-
-    FIX:
-    - Old code used: usergroup__user (doesn't exist)
-    - Correct related query name for UserGroups -> Groups is: usergroups
-      and the FK field on UserGroups to Users is: UserID (not user). :contentReference[oaicite:5]{index=5}
     """
     return Groups.objects.filter(usergroups__UserID=user).distinct()
 
@@ -99,22 +101,29 @@ def _is_clerk(user: Users) -> bool:
 def login_required_view(view_func):
     def wrapper(request, *args, **kwargs):
         user = _get_current_user(request)
+
         if not user:
             return redirect("accounts:login")
-        request.current_user = user  # attach for convenience
+
+        request.current_user = user
         return view_func(request, *args, **kwargs)
+
     return wrapper
 
 
 def admin_required_view(view_func):
     def wrapper(request, *args, **kwargs):
         user = _get_current_user(request)
+
         if not user:
             return redirect("accounts:login")
+
         if not _is_admin(user):
             return redirect("accounts:access_denied")
+
         request.current_user = user
         return view_func(request, *args, **kwargs)
+
     return wrapper
 
 
@@ -124,6 +133,7 @@ def _audit(request, event_type: str, details: str = ""):
     AuditLogs(EventType, ActorUserID, Details, EventTime)
     """
     user = _get_current_user(request)
+
     try:
         AuditLogs.objects.create(
             EventType=event_type,
@@ -132,7 +142,7 @@ def _audit(request, event_type: str, details: str = ""):
             EventTime=timezone.now(),
         )
     except Exception:
-        # Don’t block login/logout if auditing fails
+        # Do not block the main action if auditing fails.
         pass
 
 
@@ -143,7 +153,6 @@ def login_view(request):
     if request.method == "GET":
         return render(request, "accounts/login.html")
 
-    # POST
     username = (request.POST.get("username") or "").strip()
     password = request.POST.get("password") or ""
 
@@ -157,15 +166,20 @@ def login_view(request):
         messages.error(request, "Invalid login credentials.")
         return redirect("accounts:login")
 
+    # CHANGE:
+    # Updated inactive-account message so new signup users understand that
+    # they are waiting for Admin approval.
     if not getattr(user, "is_active", True):
-        messages.error(request, "Your account is disabled. Contact an Admin.")
+        messages.error(
+            request,
+            "Your account is not active yet. Please wait for an Admin to approve your account."
+        )
         return redirect("accounts:login")
 
     if not check_password(password, user.PasswordHash):
         messages.error(request, "Invalid login credentials.")
         return redirect("accounts:login")
 
-    # Start session
     request.session["user_id"] = user.UserID
     request.session["username"] = user.Username
 
@@ -200,44 +214,137 @@ def profile_view(request):
         "groups": groups,
         "is_admin": _is_admin(user),
     }
+
     return render(request, "accounts/profile.html", context)
 
 
 # ----------------------------
-# 10) access_denied_view
+# 4) access_denied_view
 # ----------------------------
 def access_denied_view(request):
     return render(request, "accounts/access_denied.html")
 
 
 # ----------------------------
-# 4) users_list_view (Admin)
+# 5) signup_view
+# ----------------------------
+# CHANGE:
+# This is a new public registration view.
+# It allows users to create an account, but the account is saved as inactive.
+# The Admin must approve/enable the account before the user can log in.
+def signup_view(request):
+    """
+    Public registration page.
+
+    New users are created as inactive accounts so they cannot log in until
+    an Admin enables/approves them from User Management.
+    """
+
+    # If an already logged-in user opens signup, send them to dashboard.
+    if request.session.get("user_id"):
+        return redirect("records:dashboard")
+
+    if request.method == "GET":
+        return render(request, "accounts/signup.html")
+
+    full_name = (request.POST.get("full_name") or "").strip()
+    username = (request.POST.get("username") or "").strip()
+    email = (request.POST.get("email") or "").strip()
+    password = (request.POST.get("password") or "").strip()
+    confirm_password = (request.POST.get("confirm_password") or "").strip()
+
+    if not full_name or not username or not email or not password:
+        messages.error(request, "Full name, username, email, and password are required.")
+        return redirect("accounts:signup")
+
+    if password != confirm_password:
+        messages.error(request, "Passwords do not match.")
+        return redirect("accounts:signup")
+
+    if Users.objects.filter(Username__iexact=username).exists():
+        messages.error(request, "Username already exists. Please choose another username.")
+        return redirect("accounts:signup")
+
+    if Users.objects.filter(Email__iexact=email).exists():
+        messages.error(request, "Email already exists. Please use another email address.")
+        return redirect("accounts:signup")
+
+    user = Users.objects.create(
+        Username=username,
+        FullName=full_name,
+        Email=email,
+        PasswordHash=make_password(password),
+
+        # CHANGE:
+        # This is the approval control.
+        # New users cannot log in until Admin enables them.
+        IsActive=False,
+
+        CreatedAt=timezone.now(),
+    )
+
+    # CHANGE:
+    # Assign new signup users to the safest default role, Viewer.
+    # They are still inactive until approved.
+    viewer_group = Groups.objects.filter(GroupName__iexact="Viewer").first()
+
+    if viewer_group:
+        UserGroups.objects.get_or_create(
+            UserID=user,
+            GroupID=viewer_group,
+        )
+
+    # CHANGE:
+    # Optional audit log entry for pending signup.
+    try:
+        AuditLogs.objects.create(
+            EventType="USER_SIGNUP_PENDING",
+            ActorUserID=None,
+            Details=f"New signup pending approval: UserID={user.UserID} Username={user.Username}",
+            EventTime=timezone.now(),
+        )
+    except Exception:
+        pass
+
+    messages.success(
+        request,
+        "Account created successfully. Please wait for an Admin to approve your account before logging in.",
+    )
+
+    return redirect("accounts:login")
+
+
+# ----------------------------
+# 6) users_list_view
 # ----------------------------
 @login_required_view
 def users_list_view(request):
     current_user = request.current_user
-    
+
     if not (_is_admin(current_user) or _is_clerk(current_user)):
         return redirect("accounts:access_denied")
-    
+
     q = (request.GET.get("q") or "").strip()
 
-    # Keep as QuerySet (do NOT convert to list before filtering)
     qs = Users.objects.all().order_by("Username")
 
     if q:
-        # Your model only guarantees Username. We'll search that, and optionally other fields if they exist.
         filters = Q(Username__icontains=q)
+
         if hasattr(Users, "FullName"):
             filters |= Q(FullName__icontains=q)
+
         if hasattr(Users, "Email"):
             filters |= Q(Email__icontains=q)
+
         qs = qs.filter(filters)
 
     users_with_groups = []
+
     for u in qs:
         u = _norm_user(u)
         groups = [_norm_group(g) for g in _get_user_groups(u)]
+
         users_with_groups.append({
             "user": u,
             "groups": groups,
@@ -268,15 +375,15 @@ def user_detail_view(request, user_id: int):
         "is_admin": _is_admin(current_user),
         "is_clerk": _is_clerk(current_user),
     })
-    
+
+
 # ----------------------------
-# 5) user_create_view (Admin)
+# 7) user_create_view
 # ----------------------------
 @admin_required_view
 def user_create_view(request):
-    
     current_user = request.current_user
-    
+
     if request.method == "GET":
         return render(request, "accounts/user_form.html", {
             "mode": "create",
@@ -295,15 +402,15 @@ def user_create_view(request):
     if not username or not password:
         messages.error(request, "Username and password are required.")
         return redirect("accounts:user_create")
-    
+
     if password != confirm_password:
         messages.error(request, "Passwords do not match.")
         return redirect("accounts:user_create")
-    
+
     if not group_id:
         messages.error(request, "A role is required.")
         return redirect("accounts:user_create")
-    
+
     try:
         group_id_int = int(group_id)
     except ValueError:
@@ -313,7 +420,7 @@ def user_create_view(request):
     if Users.objects.filter(Username__iexact=username).exists():
         messages.error(request, "Username already exists.")
         return redirect("accounts:user_create")
-    
+
     user = Users.objects.create(
         Username=username,
         Email=email or None,
@@ -324,24 +431,21 @@ def user_create_view(request):
     if hasattr(user, "FullName"):
         user.FullName = full_name
         user.save(update_fields=["FullName"])
-    
+
     UserGroups.objects.create(UserID=user, GroupID_id=group_id_int)
 
-    # =========================================================
-    # FIXED: _audit(request, event_type, details)
-    # =========================================================
     _audit(
         request,
         "USER_CREATE",
         f"Created user UserID={user.UserID} Username={user.Username}",
     )
-    
+
     messages.success(request, "User created successfully.")
     return redirect("accounts:users_list")
 
 
 # ----------------------------
-# 6) user_edit_view (Admin)
+# 8) user_edit_view
 # ----------------------------
 @admin_required_view
 def user_edit_view(request, user_id):
@@ -350,6 +454,7 @@ def user_edit_view(request, user_id):
 
     if request.method == "GET":
         groups = [_norm_group(g) for g in Groups.objects.all().order_by("GroupName")]
+
         current_group_ids = list(
             UserGroups.objects.filter(UserID=user).values_list("GroupID_id", flat=True)
         )
@@ -374,6 +479,7 @@ def user_edit_view(request, user_id):
         return redirect("accounts:user_edit", user_id=user.UserID)
 
     existing = Users.objects.filter(Username=username).exclude(UserID=user.UserID).first()
+
     if existing:
         messages.error(request, "Username already exists.")
         return redirect("accounts:user_edit", user_id=user.UserID)
@@ -415,9 +521,6 @@ def user_edit_view(request, user_id):
     UserGroups.objects.filter(UserID=user).delete()
     UserGroups.objects.create(UserID=user, GroupID_id=group_id_int)
 
-    # =========================================================
-    # FIXED: _audit(request, event_type, details)
-    # =========================================================
     _audit(
         request,
         "USER_EDIT",
@@ -427,23 +530,85 @@ def user_edit_view(request, user_id):
     messages.success(request, "User updated successfully.")
     return redirect("accounts:user_detail", user_id=user.UserID)
 
+
 # ----------------------------
-# 7) user_disable_view (Admin)
+# 9) user_disable_view
 # ----------------------------
 @admin_required_view
 def user_disable_view(request, user_id):
     user = get_object_or_404(Users, UserID=user_id)
 
+    # CHANGE:
+    # This existing enable/disable function now also works as Admin approval.
+    # If the user signed up, they are inactive.
+    # Admin clicking Approve / Enable makes IsActive=True.
     user.IsActive = not user.IsActive
     user.save()
 
     state = "enabled" if user.IsActive else "disabled"
-    _audit(request, event_type="USER_TOGGLE_ACTIVE", details=f"{state.title()} user {user.Username}.")
+
+    _audit(
+        request,
+        event_type="USER_TOGGLE_ACTIVE",
+        details=f"{state.title()} user {user.Username}."
+    )
+
     messages.success(request, f"User {user.Username} has been {state}.")
     return redirect("accounts:users_list")
 
+
+@admin_required_view
+def user_reject_signup_view(request, user_id):
+    """
+    CHANGE:
+    Reject a pending sign-up request.
+
+    This view is only for inactive users, because inactive users are treated as
+    pending approval accounts.
+
+    When Admin rejects the request:
+    - the pending user account is deleted
+    - linked UserGroups rows are deleted automatically because UserGroups uses CASCADE
+    - an audit log is created
+    """
+
+    if request.method != "POST":
+        return redirect("accounts:users_list")
+
+    user = get_object_or_404(Users, UserID=user_id)
+
+    # Safety check:
+    # Do not allow Admin to reject/delete an already active user.
+    if user.IsActive:
+        messages.error(
+            request,
+            "Only pending/inactive sign-up accounts can be rejected. Disable the user first if needed."
+        )
+        return redirect("accounts:user_detail", user_id=user.UserID)
+
+    rejected_username = user.Username
+    rejected_user_id = user.UserID
+
+    # Delete the pending account.
+    # UserGroups rows are removed automatically because UserGroups has on_delete=models.CASCADE.
+    user.delete()
+
+    _audit(
+        request,
+        event_type="USER_SIGNUP_REJECTED",
+        details=f"Rejected and deleted pending signup UserID={rejected_user_id} Username={rejected_username}.",
+    )
+
+    messages.success(
+        request,
+        f"Sign-up request for {rejected_username} has been rejected."
+    )
+
+    return redirect("accounts:users_list")
+
+
 # ----------------------------
-# 8) groups_list_view (Admin)
+# 10) groups_list_view
 # ----------------------------
 @admin_required_view
 def groups_list_view(request):
@@ -452,7 +617,7 @@ def groups_list_view(request):
 
 
 # ----------------------------
-# 9) group_permissions_view (Admin)
+# 11) group_permissions_view
 # ----------------------------
 @admin_required_view
 def group_permissions_view(request, group_id):
@@ -461,6 +626,7 @@ def group_permissions_view(request, group_id):
 
     if request.method == "POST":
         selected_permission_ids = set()
+
         for pid in request.POST.getlist("permission_ids"):
             try:
                 selected_permission_ids.add(int(pid))
@@ -482,7 +648,8 @@ def group_permissions_view(request, group_id):
 
     assigned_permission_ids = set(
         GroupPermissions.objects.filter(GroupID_id=group.GroupID).values_list(
-            "PermissionID_id", flat=True
+            "PermissionID_id",
+            flat=True,
         )
     )
 
@@ -492,7 +659,8 @@ def group_permissions_view(request, group_id):
         "assigned_permission_ids": assigned_permission_ids,
     })
 
-# Backward-compatible aliases (internal)
+
+# Backward-compatible aliases
 User = Users
 Group = Groups
 Permission = Permissions

@@ -1,24 +1,18 @@
 {% extends "base/base.html" %}
 
 {% load static %}
-{# ---------------------------------------------------- #}
-{# Page Title                                           #}
-{# ---------------------------------------------------- #}
+
 {% block title %}Login{% endblock %}
 
 {% block content %}
 
-<!-- Main container -->
 <div class="container py-4">
 
-    <!-- Center the login card -->
     <div class="row justify-content-center">
         <div class="col-md-5 col-lg-4">
 
-            <!-- White bordered card -->
             <div class="bg-white border rounded p-4">
 
-                <!-- Heading -->
                 <div class="text-center mb-4">
                     <h1 class="h5 mb-1">MD Registry System</h1>
                     <p class="text-muted small mb-0">
@@ -26,7 +20,6 @@
                     </p>
                 </div>
 
-                <!-- Display Django messages (errors, etc.) -->
                 {% if messages %}
                     {% for message in messages %}
                         <div class="alert alert-{{ message.tags|default:'info' }} small">
@@ -35,11 +28,9 @@
                     {% endfor %}
                 {% endif %}
 
-                <!-- Login Form -->
                 <form method="POST">
                     {% csrf_token %}
 
-                    <!-- Username Field -->
                     <div class="mb-3">
                         <label class="form-label">Username</label>
                         <input type="text"
@@ -49,7 +40,6 @@
                                required>
                     </div>
 
-                    <!-- Password Field -->
                     <div class="mb-4">
                         <label class="form-label">Password</label>
                         <input type="password"
@@ -59,19 +49,26 @@
                                required>
                     </div>
 
-                    <!-- Submit Button -->
                     <div class="d-grid">
                         <button type="submit"
                                 class="btn btn-outline-primary">
                             Login
                         </button>
                     </div>
-
                 </form>
+
+                <!-- CHANGE:
+                     Added Sign Up link.
+                     This lets new users request an account from the login page. -->
+                <div class="text-center mt-3">
+                    <small class="text-muted">
+                        Do not have an account?
+                        <a href="{% url 'accounts:signup' %}">Sign up</a>
+                    </small>
+                </div>
 
             </div>
 
-            <!-- Optional footer text -->
             <div class="text-center mt-3">
                 <small class="text-muted">
                     © {% now "Y" %} MD Registry

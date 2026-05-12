@@ -1,16 +1,12 @@
 {% extends "base/base.html" %}
 {% load static %}
 
-{# ---------------------------------------------------- #}
-{# Page Title                                           #}
-{# ---------------------------------------------------- #}
 {% block title %}Users{% endblock %}
 
 {% block content %}
 
 <div class="container py-4">
 
-    <!-- Page Header -->
     <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
             <h1 class="h5 mb-1">User Management</h1>
@@ -19,7 +15,6 @@
             </p>
         </div>
 
-        <!-- Create User Button -->
         {% if is_admin %}
         <a href="{% url 'accounts:user_create' %}" class="btn btn-outline-primary btn-sm">
             + Create User
@@ -27,10 +22,8 @@
         {% endif %}
     </div>
 
-    <!-- Search / Filter Bar -->
     <form method="GET" class="d-flex flex-wrap gap-2 align-items-center mb-3">
 
-        <!-- Search input -->
         <input type="text"
                name="q"
                value="{{ q }}"
@@ -38,19 +31,16 @@
                style="max-width: 320px;"
                placeholder="Search username, name, email">
 
-        <!-- Search button -->
         <button type="submit" class="btn btn-outline-secondary btn-sm">
             Search
         </button>
 
-        <!-- Reset button -->
         <a href="{% url 'accounts:users_list' %}" class="btn btn-outline-secondary btn-sm">
             Reset
         </a>
 
     </form>
 
-    <!-- Messages -->
     {% if messages %}
         {% for message in messages %}
             <div class="alert alert-{{ message.tags|default:'info' }} small">
@@ -59,13 +49,11 @@
         {% endfor %}
     {% endif %}
 
-    <!-- Users Table Card -->
     <div class="bg-white border rounded p-0">
 
         <div class="table-responsive">
             <table class="table align-middle mb-0">
 
-                <!-- Table Header -->
                 <thead class="table-light">
                     <tr>
                         <th>Username</th>
@@ -79,15 +67,12 @@
 
                 <tbody>
 
-                    {# users_with_groups = [{ user: User, groups: [Group...] }, ...] #}
                     {% for item in users_with_groups %}
                         {% with user=item.user groups=item.groups %}
 
                         <tr>
-                            <!-- Username -->
                             <td class="fw-medium">{{ user.username }}</td>
 
-                            <!-- Full Name -->
                             <td>
                                 {% if user.full_name %}
                                     {{ user.full_name }}
@@ -96,7 +81,6 @@
                                 {% endif %}
                             </td>
 
-                            <!-- Email -->
                             <td>
                                 {% if user.email %}
                                     {{ user.email }}
@@ -105,7 +89,6 @@
                                 {% endif %}
                             </td>
 
-                            <!-- Roles -->
                             <td>
                                 {% for group in groups %}
 
@@ -124,44 +107,66 @@
                                 {% endfor %}
                             </td>
 
-                            <!-- Active/Disabled -->
                             <td>
                                 {% if user.is_active %}
                                     <span class="badge text-bg-success">Active</span>
                                 {% else %}
-                                    <span class="badge text-bg-danger">Disabled</span>
+
+                                    <!-- CHANGE:
+                                         Inactive users are now shown as pending approval.
+                                         This makes signup approval clear to the Admin. -->
+                                    <span class="badge text-bg-warning text-dark">
+                                        Pending Approval / Disabled
+                                    </span>
+
                                 {% endif %}
                             </td>
 
-                            <!-- Actions -->
                             <td class="text-end">
                                 <a href="{% url 'accounts:user_detail' user.UserID %}"
-                                        class="btn btn-outline-secondary btn-sm">
-                                        View
+                                   class="btn btn-outline-secondary btn-sm">
+                                    View
                                 </a>
 
-                                <!-- Edit -->
                                 {% if is_admin %}
                                     <a href="{% url 'accounts:user_edit' user.UserID %}"
-                                    class="btn btn-outline-primary btn-sm">
+                                       class="btn btn-outline-primary btn-sm">
                                         Edit
                                     </a>
 
-                                    <!-- Enable/Disable toggle -->
                                     <form method="post"
-                                        action="{% url 'accounts:user_disable' user.UserID %}"
-                                        class="d-inline">
+                                          action="{% url 'accounts:user_disable' user.UserID %}"
+                                          class="d-inline">
                                         {% csrf_token %}
+
                                         {% if user.is_active %}
                                             <button type="submit" class="btn btn-outline-danger btn-sm">
                                                 Disable
                                             </button>
                                         {% else %}
+
+                                            <!-- CHANGE:
+                                                 Inactive users can be approved/enabled by Admin here. -->
                                             <button type="submit" class="btn btn-outline-success btn-sm">
-                                                Enable
+                                                Approve / Enable
                                             </button>
+
                                         {% endif %}
                                     </form>
+                                    {% if not user.is_active %}
+                                        <!-- CHANGE:
+                                            Admin can reject a pending sign-up request.
+                                            This submits a POST request and deletes the inactive pending account. -->
+                                        <form method="post"
+                                            action="{% url 'accounts:user_reject_signup' user.UserID %}"
+                                            class="d-inline"
+                                            onsubmit="return confirm('Reject this sign-up request? This will delete the pending account.');">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-outline-danger btn-sm">
+                                                Reject
+                                            </button>
+                                        </form>
+                                    {% endif %}
                                 {% endif %}
                             </td>
                         </tr>
@@ -169,7 +174,6 @@
                         {% endwith %}
                     {% empty %}
 
-                        <!-- If no users -->
                         <tr>
                             <td colspan="6" class="text-center text-muted py-4">
                                 No users found.

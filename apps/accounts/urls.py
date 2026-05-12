@@ -5,6 +5,7 @@ app_name = "accounts"
 
 urlpatterns = [
     path("login/", views.login_view, name="login"),
+    path("signup/", views.signup_view, name="signup"),
     path("logout/", views.logout_view, name="logout"),
     path("profile/", views.profile_view, name="profile"),
 
@@ -12,6 +13,16 @@ urlpatterns = [
     path("users/create/", views.user_create_view, name="user_create"),
     path("users/<int:user_id>/edit/", views.user_edit_view, name="user_edit"),
     path("users/<int:user_id>/toggle-active/", views.user_disable_view, name="user_disable"),
+
+    # CHANGE:
+    # Admin can reject a pending sign-up account.
+    # This deletes the inactive pending account.
+    path(
+        "users/<int:user_id>/reject-signup/",
+        views.user_reject_signup_view,
+        name="user_reject_signup",
+    ),
+
     path("users/<int:user_id>/", views.user_detail_view, name="user_detail"),
 
     path("groups/", views.groups_list_view, name="groups_list"),

@@ -1,0 +1,110 @@
+{% extends "base/base.html" %}
+{% load static %}
+
+{% block title %}Sign Up{% endblock %}
+
+{% block content %}
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-5">
+
+            <div class="bg-white border rounded p-4">
+
+                <div class="text-center mb-4">
+                    <h1 class="h5 mb-1">Create Account</h1>
+                    <p class="text-muted small mb-0">
+                        Your account will be reviewed by an Admin before you can log in.
+                    </p>
+                </div>
+
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags|default:'info' }} small">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                <!-- CHANGE:
+                     New public sign-up form.
+                     The account created by this form is inactive until Admin approval. -->
+                <form method="POST">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label class="form-label">Full Name</label>
+                        <input type="text"
+                               name="full_name"
+                               class="form-control"
+                               placeholder="Enter your full name"
+                               required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Username</label>
+                        <input type="text"
+                               name="username"
+                               class="form-control"
+                               placeholder="Choose a username"
+                               required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Email</label>
+                        <input type="email"
+                               name="email"
+                               class="form-control"
+                               placeholder="Enter your email address"
+                               required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Password</label>
+                        <input type="password"
+                               name="password"
+                               class="form-control"
+                               placeholder="Create a password"
+                               required>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">Confirm Password</label>
+                        <input type="password"
+                               name="confirm_password"
+                               class="form-control"
+                               placeholder="Confirm your password"
+                               required>
+                    </div>
+
+                    <!-- CHANGE:
+                         Clear warning that signup does not give immediate access. -->
+                    <div class="alert alert-warning small">
+                        After signing up, you will not be able to log in until an Admin approves your account.
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-outline-primary">
+                            Submit Sign Up Request
+                        </button>
+                    </div>
+                </form>
+
+                <div class="text-center mt-3">
+                    <small class="text-muted">
+                        Already have an approved account?
+                        <a href="{% url 'accounts:login' %}">Login</a>
+                    </small>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/accounts.js' %}"></script>
+{% endblock %}
