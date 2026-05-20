@@ -1926,14 +1926,16 @@ def records_import_excel_view(request):
     def _col(name: str):
         return headers.index(name) + 1 if name in headers else None
 
-    # ✅ Required headers (schema aligned)
+    # Required for every row.
+    # IncomingDepartmentName is no longer globally required because external documents
+    # must use ExternalCompanyName instead.
     required_headers = [
         "MessengerName",
         "Subject",
         "Description",
         "DateReceived",
         "InvoiceNumber",
-        "IncomingDepartmentName",  # we recommend Name-based lookup
+        "ExternalDocument",
         "Status",
     ]
 
@@ -1942,8 +1944,10 @@ def records_import_excel_view(request):
         messages.error(request, f"Missing required column(s): {', '.join(missing)}")
         return redirect("records:records_import_excel")
 
-    # Optional headers
+    # Optional / conditional headers
+    c_in_name = _col("IncomingDepartmentName")
     c_out_name = _col("OutgoingDepartmentName")
+    c_external_company = _col("ExternalCompanyName")
     c_date_disp = _col("DateDispatched")
     c_returned = _col("Returned")
     c_date_ret = _col("DateReturned")
@@ -1953,7 +1957,7 @@ def records_import_excel_view(request):
     c_desc = _col("Description")
     c_date_recv = _col("DateReceived")
     c_invoice = _col("InvoiceNumber")
-    c_in_name = _col("IncomingDepartmentName")
+    c_external_doc = _col("ExternalDocument")
     c_status = _col("Status")
 
     def _cell_str(row, col):
@@ -1973,7 +1977,6 @@ def records_import_excel_view(request):
             try:
                 dt = datetime.fromisoformat(s)
             except Exception:
-                # try common "YYYY-MM-DD HH:MM"
                 try:
                     dt = datetime.strptime(s, "%Y-%m-%d %H:%M")
                 except Exception:
@@ -2023,7 +2026,7 @@ def records_import_excel_view(request):
     # Row-by-row import
     # -----------------------------
     for row_idx in range(2, ws.max_row + 1):
-        # skip empty rows
+        # Skip empty rows
         row_values = [ws.cell(row=row_idx, column=c).value for c in range(1, ws.max_column + 1)]
         if all(v is None or str(v).strip() == "" for v in row_values):
             continue
@@ -2032,11 +2035,9 @@ def records_import_excel_view(request):
         subject = _cell_str(row_idx, c_subject)
         description = _cell_str(row_idx, c_desc)
 
-        # ✅ DateReceived required
         date_received_raw = ws.cell(row=row_idx, column=c_date_recv).value
         date_received = _parse_excel_datetime(date_received_raw)
 
-        # ✅ InvoiceNumber required (commas allowed)
         invoice_raw = _cell_str(row_idx, c_invoice)
         invoice_clean = invoice_raw.replace(",", "").strip()
         invoice_int = None
@@ -2046,20 +2047,13 @@ def records_import_excel_view(request):
             except Exception:
                 invoice_int = None
 
-        # ✅ Incoming Department required (by name)
+        external_document = _normalize_yes_no(_cell_str(row_idx, c_external_doc))
         incoming_name = _cell_str(row_idx, c_in_name)
-        incoming_dept = _get_or_create_department_by_name(incoming_name)
-        
-        # ✅ Outgoing Department optional (auto-create if provided)
-        outgoing_name = _cell_str(row_idx, c_out_name) if c_out_name else ""
-        outgoing_dept = _get_or_create_department_by_name(outgoing_name) if outgoing_name else None
+        outgoing_name = _cell_str(row_idx, c_out_name)
+        external_company_name = _cell_str(row_idx, c_external_company)
 
-        # ✅ Status required and normalized
         status_raw = _cell_str(row_idx, c_status)
         status = _normalize_status(status_raw)
-
-        # Optional fields
-        outgoing_dept = _get_or_create_department_by_name(_cell_str(row_idx, c_out_name)) if c_out_name else None
 
         date_dispatched = None
         if c_date_disp:
@@ -2069,7 +2063,7 @@ def records_import_excel_view(request):
         date_returned = _parse_excel_date(ws.cell(row=row_idx, column=c_date_ret).value) if c_date_ret else None
 
         # -----------------------------
-        # ✅ Match Add/Edit validation rules
+        # Basic required validation
         # -----------------------------
         if not messenger_name:
             failed += 1
@@ -2091,54 +2085,101 @@ def records_import_excel_view(request):
             failed += 1
             errors.append(f"Row {row_idx}: InvoiceNumber must be numeric (commas allowed).")
             continue
-        if not incoming_dept:
+        if external_document not in ("Yes", "No"):
             failed += 1
-            errors.append(f"Row {row_idx}: IncomingDepartmentName is required.")
+            errors.append(f"Row {row_idx}: ExternalDocument must be 'Yes' or 'No'.")
             continue
         if not status:
             failed += 1
             errors.append(f"Row {row_idx}: Status must be 'With MD' or 'Not with MD'.")
             continue
 
+        incoming_dept = None
+        outgoing_dept = None
+        external_company = None
+
+        # -----------------------------
+        # Mutual exclusivity validation
+        # -----------------------------
+        if external_document == "Yes":
+            if incoming_name or outgoing_name:
+                failed += 1
+                errors.append(
+                    f"Row {row_idx}: External documents cannot have IncomingDepartmentName or OutgoingDepartmentName."
+                )
+                continue
+            if not external_company_name:
+                failed += 1
+                errors.append(f"Row {row_idx}: ExternalCompanyName is required when ExternalDocument is 'Yes'.")
+                continue
+
+            external_company = _get_or_create_external_company_name(external_company_name)
+
+        else:  # ExternalDocument == "No"
+            if external_company_name:
+                failed += 1
+                errors.append(f"Row {row_idx}: ExternalCompanyName must be blank when ExternalDocument is 'No'.")
+                continue
+            if not incoming_name:
+                failed += 1
+                errors.append(f"Row {row_idx}: IncomingDepartmentName is required when ExternalDocument is 'No'.")
+                continue
+
+            incoming_dept = _get_or_create_department_by_name(incoming_name)
+            outgoing_dept = _get_or_create_department_by_name(outgoing_name) if outgoing_name else None
+
+            if date_dispatched and not outgoing_dept:
+                failed += 1
+                errors.append(f"Row {row_idx}: OutgoingDepartmentName is required when an internal document has DateDispatched filled.")
+                continue
+
+        # -----------------------------
+        # Status / returned validation
+        # -----------------------------
         if not date_dispatched:
             status = "With MD"
             returned = ""
             date_returned = None
 
-        # If Date Dispatched is filled -> Outgoing Department required
-        if date_dispatched and not outgoing_dept:
-            failed += 1
-            errors.append(f"Row {row_idx}: OutgoingDepartmentName is required when DateDispatched is filled.")
-            continue
-
-        # If dispatched AND Not with MD -> force Returned = No and clear DateReturned
         if date_dispatched and status == "Not with MD":
             returned = "No"
             date_returned = None
 
-        # If dispatched AND With MD -> force Returned = Yes and require DateReturned
         if date_dispatched and status == "With MD":
             returned = "Yes"
             if not date_returned:
                 failed += 1
-                errors.append(f"Row {row_idx}: DateReturned is required when Status is 'With MD' and DateDispatched is filled.")
+                errors.append(
+                    f"Row {row_idx}: DateReturned is required when Status is 'With MD' and DateDispatched is filled."
+                )
                 continue
 
-        # Consistency check
         if date_returned and returned != "Yes":
             failed += 1
             errors.append(f"Row {row_idx}: Returned must be 'Yes' when DateReturned is filled.")
             continue
+
         # -----------------------------
-        # ✅ Duplicate detection (skip duplicates)
-        # Key: InvoiceNumber + DateReceived(date) + IncomingDept + Subject
+        # Duplicate detection
+        # Internal key: InvoiceNumber + DateReceived(date) + IncomingDept + Subject
+        # External key: InvoiceNumber + DateReceived(date) + ExternalCompanyName + Subject
         # -----------------------------
-        dup_exists = Record.objects.filter(
-            InvoiceNumber=invoice_int,
-            DateReceived__date=date_received.date(),
-            IncomingDepartmentID=incoming_dept,
-            Subject__iexact=subject,
-        ).exists()
+        if external_document == "Yes":
+            dup_exists = Record.objects.filter(
+                InvoiceNumber=invoice_int,
+                DateReceived__date=date_received.date(),
+                ExternalDocument="Yes",
+                ExternalCompanyName=external_company,
+                Subject__iexact=subject,
+            ).exists()
+        else:
+            dup_exists = Record.objects.filter(
+                InvoiceNumber=invoice_int,
+                DateReceived__date=date_received.date(),
+                ExternalDocument="No",
+                IncomingDepartmentID=incoming_dept,
+                Subject__iexact=subject,
+            ).exists()
 
         if dup_exists:
             skipped_duplicates += 1
@@ -2148,7 +2189,7 @@ def records_import_excel_view(request):
         # Create record
         # -----------------------------
         try:
-            rec = Record.objects.create(
+            Record.objects.create(
                 MessengerName=messenger_name,
                 Subject=subject,
                 Description=description,
@@ -2156,6 +2197,8 @@ def records_import_excel_view(request):
                 InvoiceNumber=invoice_int,
                 IncomingDepartmentID=incoming_dept,
                 OutgoingDepartmentID=outgoing_dept,
+                ExternalDocument=external_document,
+                ExternalCompanyName=external_company,
                 DateDispatched=date_dispatched,
                 Returned=returned if returned in ("Yes", "No") else None,
                 DateReturned=date_returned,
@@ -2196,15 +2239,20 @@ def import_template_download_view(request):
     ws = wb.active
     ws.title = "ImportTemplate"
 
-    # ✅ 11-field schema template headers (matches your Records model)
+    # Updated schema:
+    # - ExternalDocument decides the type of record.
+    # - If ExternalDocument = Yes, use ExternalCompanyName and leave department columns blank.
+    # - If ExternalDocument = No, use IncomingDepartmentName/OutgoingDepartmentName and leave ExternalCompanyName blank.
     headers = [
         "MessengerName",
         "Subject",
         "Description",
         "DateReceived",               # e.g. 2026-02-25 10:30
         "InvoiceNumber",              # commas allowed: 111,123
-        "IncomingDepartmentName",     # REQUIRED (recommended)
-        "OutgoingDepartmentName",     # optional unless DateDispatched filled
+        "ExternalDocument",           # REQUIRED: Yes / No
+        "ExternalCompanyName",        # REQUIRED only when ExternalDocument = Yes
+        "IncomingDepartmentName",     # REQUIRED only when ExternalDocument = No
+        "OutgoingDepartmentName",     # Internal only; required if internal record has DateDispatched
         "DateDispatched",             # optional datetime
         "Status",                     # REQUIRED: With MD / Not with MD
         "Returned",                   # conditional
@@ -2212,29 +2260,61 @@ def import_template_download_view(request):
     ]
     ws.append(headers)
 
-    # ✅ Example row
+    # Example 1: External company document
+    ws.append([
+        "Adewale Courier",
+        "External Vendor Contract",
+        "Contract document submitted by an external company for MD review.",
+        "2026-02-25 10:30",
+        "111,123",
+        "Yes",
+        "Zenith Insurance Plc",
+        "",
+        "",
+        "",
+        "With MD",
+        "",
+        "",
+    ])
+
+    # Example 2: Internal department document
     ws.append([
         "John Messenger",
         "Budget Approval",
-        "Document for MD review and approval.",
-        "2026-02-25 10:30",
-        "111,123",
+        "Internal document for MD review and approval.",
+        "2026-02-26 09:15",
+        "111,124",
+        "No",
+        "",
         "Registry",
-        "",                 # OutgoingDepartmentName
-        "",                 # DateDispatched
-        "With MD",
-        "",                 # Returned
-        "",                 # DateReturned
+        "Finance Department",
+        "2026-02-26 15:00",
+        "Not with MD",
+        "No",
+        "",
     ])
 
-    for idx in range(1, len(headers) + 1):
-        ws.column_dimensions[get_column_letter(idx)].width = 24
+    guide = wb.create_sheet("Import Guide")
+    guide.append(["Rule", "Condition"])
+    guide.append(["File type", "Upload .xlsx only"])
+    guide.append(["ExternalDocument", "Must be Yes or No"])
+    guide.append(["External document", "ExternalDocument = Yes, ExternalCompanyName filled, IncomingDepartmentName blank, OutgoingDepartmentName blank"])
+    guide.append(["Internal document", "ExternalDocument = No, IncomingDepartmentName filled, ExternalCompanyName blank"])
+    guide.append(["Mutual exclusivity", "A row cannot have department values and ExternalCompanyName at the same time"])
+    guide.append(["Status", "Must be With MD or Not with MD"])
+    guide.append(["InvoiceNumber", "Must be numeric; commas are allowed"])
+    guide.append(["DateReceived", "Use YYYY-MM-DD HH:MM"])
+    guide.append(["DateReturned", "Required only when DateDispatched is filled and Status is With MD"])
+
+    for sheet in wb.worksheets:
+        for idx in range(1, sheet.max_column + 1):
+            sheet.column_dimensions[get_column_letter(idx)].width = 28
 
     bio = io.BytesIO()
     wb.save(bio)
     bio.seek(0)
 
-    _audit(request, "IMPORT_TEMPLATE_DOWNLOAD", "Downloaded Excel import template (11-field schema)")
+    _audit(request, "IMPORT_TEMPLATE_DOWNLOAD", "Downloaded Excel import template with external document support")
 
     filename = "md_registry_import_template.xlsx"
     resp = HttpResponse(
