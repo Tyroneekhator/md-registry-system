@@ -175,6 +175,13 @@ def _build_filtered_records_qs(request, user):
     incoming_department_id = (request.GET.get("incoming_department_id") or "").strip()
     external_company_name_id = (request.GET.get("external_company_name_id") or "").strip()
     outgoing_department_id = (request.GET.get("outgoing_department_id") or "").strip()
+
+    # Search-by-name fields shown directly after Invoice number in the UI.
+    # These are separate from the existing dropdown filters below.
+    external_company_name = (request.GET.get("external_company_name") or "").strip()
+    incoming_department_name = (request.GET.get("incoming_department_name") or "").strip()
+    outgoing_department_name = (request.GET.get("outgoing_department_name") or "").strip()
+
     include_deleted = request.GET.get("include_deleted") == "1" and _is_admin(user)
 
     qs = Record.objects.all()
@@ -264,6 +271,20 @@ def _build_filtered_records_qs(request, user):
         qs = qs.filter(OutgoingDepartmentID_id=int(outgoing_department_id))
 
     # =========================
+    # Search-by-name filters
+    # These work with the three text search boxes placed after Invoice number.
+    # The existing dropdown filters still remain in the Filters section.
+    # =========================
+    if external_company_name and hasattr(Record, "ExternalCompanyName"):
+        qs = qs.filter(ExternalCompanyName__CompanyName__icontains=external_company_name)
+
+    if incoming_department_name and hasattr(Record, "IncomingDepartmentID"):
+        qs = qs.filter(IncomingDepartmentID__DepartmentName__icontains=incoming_department_name)
+
+    if outgoing_department_name and hasattr(Record, "OutgoingDepartmentID"):
+        qs = qs.filter(OutgoingDepartmentID__DepartmentName__icontains=outgoing_department_name)
+
+    # =========================
     # Search (q)
     # =========================
     if q:
@@ -310,6 +331,7 @@ def _has_any_filter_params(request) -> bool:
     FILTER_KEYS = [
         # text/flags
         "q", "Status", "invoice_number", "subject", "messenger_name", "returned",
+        "external_company_name", "incoming_department_name", "outgoing_department_name",
         "external_company_name_id",
 
         # CORRECTION: include pending_request as its own filter key
@@ -584,6 +606,9 @@ def records_table_view(request):
     sort = (request.GET.get("sort") or "").strip().lower()
     dir_ = (request.GET.get("dir") or "desc").strip().lower()
     external_company_name_id = (request.GET.get("external_company_name_id") or "").strip()
+    external_company_name = (request.GET.get("external_company_name") or "").strip()
+    incoming_department_name = (request.GET.get("incoming_department_name") or "").strip()
+    outgoing_department_name = (request.GET.get("outgoing_department_name") or "").strip()
     external_company_names = ExternalCompanyNames.objects.all().order_by("CompanyName")
 
     invoice_number_raw = (request.GET.get("invoice_number") or "").strip()
@@ -649,6 +674,9 @@ def records_table_view(request):
         "messenger_name": messenger_name,
         "returned": returned,
         "external_company_name_id": external_company_name_id,
+        "external_company_name": external_company_name,
+        "incoming_department_name": incoming_department_name,
+        "outgoing_department_name": outgoing_department_name,
         "external_company_names": external_company_names,
 
         # CORRECTION: pass pending_request back to template

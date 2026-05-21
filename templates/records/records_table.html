@@ -119,6 +119,54 @@
                   value="{{ invoice_number|default:'' }}" placeholder="e.g., 1023">
         </div>
 
+        <!-- External company name search -->
+        <div class="col-md-4">
+          <label class="form-label small">
+            External company name
+            <span class="ms-1 text-muted rounded-circle border d-inline-flex align-items-center justify-content-center"
+                  style="width:18px; height:18px; font-size:12px; cursor:pointer;"
+                  data-bs-toggle="tooltip"
+                  title="Search by External Company Name (contains match). The original dropdown filter remains below.">?</span>
+          </label>
+          <input type="text" class="form-control form-control-sm"
+                 id="externalCompanyNameSearchInput"
+                 name="external_company_name"
+                 value="{{ external_company_name|default:'' }}"
+                 placeholder="e.g., ABC Company">
+        </div>
+
+        <!-- Incoming department name search -->
+        <div class="col-md-4">
+          <label class="form-label small">
+            Incoming department name
+            <span class="ms-1 text-muted rounded-circle border d-inline-flex align-items-center justify-content-center"
+                  style="width:18px; height:18px; font-size:12px; cursor:pointer;"
+                  data-bs-toggle="tooltip"
+                  title="Search by Incoming Department Name (contains match). The original dropdown filter remains below.">?</span>
+          </label>
+          <input type="text" class="form-control form-control-sm"
+                 id="incomingDepartmentNameSearchInput"
+                 name="incoming_department_name"
+                 value="{{ incoming_department_name|default:'' }}"
+                 placeholder="e.g., Finance">
+        </div>
+
+        <!-- Outgoing department name search -->
+        <div class="col-md-4">
+          <label class="form-label small">
+            Outgoing department name
+            <span class="ms-1 text-muted rounded-circle border d-inline-flex align-items-center justify-content-center"
+                  style="width:18px; height:18px; font-size:12px; cursor:pointer;"
+                  data-bs-toggle="tooltip"
+                  title="Search by Outgoing Department Name (contains match). The original dropdown filter remains below.">?</span>
+          </label>
+          <input type="text" class="form-control form-control-sm"
+                 id="outgoingDepartmentNameSearchInput"
+                 name="outgoing_department_name"
+                 value="{{ outgoing_department_name|default:'' }}"
+                 placeholder="e.g., Audit">
+        </div>
+
         <!-- Status -->
         <div class="col-md-3">
           <label class="form-label small">
@@ -394,7 +442,7 @@
                 {% if page_obj.has_previous %}
                     <li class="page-item">
                       <a class="page-link"
-                          href="?page={{ page_obj.previous_page_number }}&invoice_number={{ invoice_number|default:''|urlencode }}&messenger_name={{ messenger_name|default:''|urlencode }}&subject={{ subject|default:''|urlencode }}&date_received_from={{ date_received_from|default:''|urlencode }}&date_received_to={{ date_received_to|default:''|urlencode }}&external_company_name_id={{ external_company_name_id|default:''|urlencode }} &incoming_department_id={{ incoming_department_id|default:''|urlencode }}&outgoing_department_id={{ outgoing_department_id|default:''|urlencode }}&date_dispatched_from={{ date_dispatched_from|default:''|urlencode }}&date_dispatched_to={{ date_dispatched_to|default:''|urlencode }}&returned={{ returned|default:''|urlencode }}&pending_request={{ pending_request|default:''|urlencode }}&date_returned_from={{ date_returned_from|default:''|urlencode }}&date_returned_to={{ date_returned_to|default:''|urlencode }}&Status={{ request.GET.Status|default:''|urlencode }}&sort={{ request.GET.sort|default:''|urlencode }}&dir={{ request.GET.dir|default:''|urlencode }}">
+                          href="?page={{ page_obj.previous_page_number }}&invoice_number={{ invoice_number|default:''|urlencode }}&external_company_name={{ external_company_name|default:''|urlencode }}&incoming_department_name={{ incoming_department_name|default:''|urlencode }}&outgoing_department_name={{ outgoing_department_name|default:''|urlencode }}&messenger_name={{ messenger_name|default:''|urlencode }}&subject={{ subject|default:''|urlencode }}&date_received_from={{ date_received_from|default:''|urlencode }}&date_received_to={{ date_received_to|default:''|urlencode }}&external_company_name_id={{ external_company_name_id|default:''|urlencode }}&incoming_department_id={{ incoming_department_id|default:''|urlencode }}&outgoing_department_id={{ outgoing_department_id|default:''|urlencode }}&date_dispatched_from={{ date_dispatched_from|default:''|urlencode }}&date_dispatched_to={{ date_dispatched_to|default:''|urlencode }}&returned={{ returned|default:''|urlencode }}&pending_request={{ pending_request|default:''|urlencode }}&date_returned_from={{ date_returned_from|default:''|urlencode }}&date_returned_to={{ date_returned_to|default:''|urlencode }}&Status={{ request.GET.Status|default:''|urlencode }}&sort={{ request.GET.sort|default:''|urlencode }}&dir={{ request.GET.dir|default:''|urlencode }}">
                         Previous
                       </a>
                     </li>
@@ -407,7 +455,7 @@
                   {% if page_obj.has_next %}
                     <li class="page-item">
                       <a class="page-link"
-                          href="?page={{ page_obj.next_page_number }}&invoice_number={{ invoice_number|default:''|urlencode }}&messenger_name={{ messenger_name|default:''|urlencode }}&subject={{ subject|default:''|urlencode }}&date_received_from={{ date_received_from|default:''|urlencode }}&date_received_to={{ date_received_to|default:''|urlencode }}&external_company_name_id={{ external_company_name_id|default:''|urlencode }} &incoming_department_id={{ incoming_department_id|default:''|urlencode }}&outgoing_department_id={{ outgoing_department_id|default:''|urlencode }}&date_dispatched_from={{ date_dispatched_from|default:''|urlencode }}&date_dispatched_to={{ date_dispatched_to|default:''|urlencode }}&returned={{ returned|default:''|urlencode }}&pending_request={{ pending_request|default:''|urlencode }}&date_returned_from={{ date_returned_from|default:''|urlencode }}&date_returned_to={{ date_returned_to|default:''|urlencode }}&Status={{ request.GET.Status|default:''|urlencode }}&sort={{ request.GET.sort|default:''|urlencode }}&dir={{ request.GET.dir|default:''|urlencode }}">
+                          href="?page={{ page_obj.next_page_number }}&invoice_number={{ invoice_number|default:''|urlencode }}&external_company_name={{ external_company_name|default:''|urlencode }}&incoming_department_name={{ incoming_department_name|default:''|urlencode }}&outgoing_department_name={{ outgoing_department_name|default:''|urlencode }}&messenger_name={{ messenger_name|default:''|urlencode }}&subject={{ subject|default:''|urlencode }}&date_received_from={{ date_received_from|default:''|urlencode }}&date_received_to={{ date_received_to|default:''|urlencode }}&external_company_name_id={{ external_company_name_id|default:''|urlencode }}&incoming_department_id={{ incoming_department_id|default:''|urlencode }}&outgoing_department_id={{ outgoing_department_id|default:''|urlencode }}&date_dispatched_from={{ date_dispatched_from|default:''|urlencode }}&date_dispatched_to={{ date_dispatched_to|default:''|urlencode }}&returned={{ returned|default:''|urlencode }}&pending_request={{ pending_request|default:''|urlencode }}&date_returned_from={{ date_returned_from|default:''|urlencode }}&date_returned_to={{ date_returned_to|default:''|urlencode }}&Status={{ request.GET.Status|default:''|urlencode }}&sort={{ request.GET.sort|default:''|urlencode }}&dir={{ request.GET.dir|default:''|urlencode }}">
                         Next
                       </a>
                     </li>

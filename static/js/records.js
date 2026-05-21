@@ -287,7 +287,14 @@
       // CORRECTION: clear current form without replacing it
       form.reset();
 
-      ["messenger_name", "subject", "invoice_number"].forEach(function (name) {
+      [
+        "messenger_name",
+        "subject",
+        "invoice_number",
+        "external_company_name",
+        "incoming_department_name",
+        "outgoing_department_name",
+      ].forEach(function (name) {
         const el = form.querySelector(`[name="${name}"]`);
         if (el) el.value = "";
       });
@@ -320,6 +327,9 @@
     const messengerInput = document.getElementById("messengerNameInput");
     const subjectInput = document.getElementById("subjectInput");
     const invoiceInput = document.getElementById("invoiceNumberInput");
+    const externalCompanyInput = document.getElementById("externalCompanyNameSearchInput");
+    const incomingDepartmentInput = document.getElementById("incomingDepartmentNameSearchInput");
+    const outgoingDepartmentInput = document.getElementById("outgoingDepartmentNameSearchInput");
 
     let typingTimer = null;
     const delayMs = 500;
@@ -338,7 +348,14 @@
       typingTimer = window.setTimeout(triggerLiveFilter, delayMs);
     }
 
-    [messengerInput, subjectInput, invoiceInput].forEach(function (input) {
+    [
+      messengerInput,
+      subjectInput,
+      invoiceInput,
+      externalCompanyInput,
+      incomingDepartmentInput,
+      outgoingDepartmentInput,
+    ].forEach(function (input) {
       if (!input) return;
 
       input.addEventListener("input", handleTyping);
