@@ -5,6 +5,10 @@ A Django-based office records management system for tracking incoming and outgoi
 This project is structured as a multi-app Django application backed by **Microsoft SQL Server** and designed for internal office use. It includes role-based access, sign-up approval, workflow requests, soft deletes, restores, Excel import/export, and audit logging.
 
 ---
+## Live demo of the project 
+The demo of the project is below:
+
+[Click here to watch the MD Registry System demo](https://drive.google.com/file/d/1Mk6aVBWEpaLj4wwwmDC6DvcxDo40el_l/view?usp=drive_link)
 
 ## What this project does
 
